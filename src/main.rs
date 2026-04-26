@@ -10,6 +10,7 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use tokio::{net::TcpListener, signal};
@@ -36,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/data", post(submit_data))
         .route("/data", get(get_data))
+        .route("/time", get(async || Utc::now().timestamp_millis().to_string()))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(10),
