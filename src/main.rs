@@ -19,7 +19,7 @@ use sqlx::{Pool, Sqlite, prelude::FromRow};
 use tokio::{net::TcpListener, signal};
 use tower_http::timeout::TimeoutLayer;
 use tracing::{info, instrument, level_filters::LevelFilter, warn};
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Clone)]
 struct AppState {
@@ -36,7 +36,15 @@ async fn main() -> anyhow::Result<()> {
     let env_filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
         .from_env_lossy();
-    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    let fmt = if env::var("INVOCATION_ID").is_ok() {
+        tracing_subscriber::fmt::layer().without_time().boxed()
+    } else {
+        tracing_subscriber::fmt::layer().boxed()
+    };
+    tracing_subscriber::Registry::default()
+        .with(fmt)
+        .with(env_filter)
+        .init();
 
     let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| "./db.sqlite".to_string());
     let pool = sqlx::SqlitePool::connect(&database_url).await?;
@@ -103,7 +111,7 @@ async fn time(ClientIp(ip): ClientIp, State(state): State<AppState>) -> Result<S
     let now = chrono::Utc::now();
     let offset = tz.offset_from_utc_datetime(&now.naive_utc());
     let offset = offset.base_utc_offset().num_milliseconds();
-    
+
     Ok((now.timestamp_millis() + offset).to_string())
 }
 
