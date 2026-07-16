@@ -117,17 +117,17 @@ async fn time(ClientIp(ip): ClientIp, State(state): State<AppState>) -> Result<S
 
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 struct SensorData {
-    air_temp: f32,
-    ground_temp: f32,
-    humidity: i8,
+    air_temp: Option<f32>,
+    ground_temp: Option<f32>,
+    humidity: Option<u8>,
     /// NOx index
-    nox: u16,
+    nox: Option<u16>,
     /// VOC index
-    voc: u16,
+    voc: Option<u16>,
     /// 10 micrometers
-    pm10: u16,
+    pm10: Option<u16>,
     /// 2.5 micrometers
-    pm25: u16,
+    pm25: Option<u16>,
     submitted_at: Option<u64>,
 }
 
