@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DPIA Sensor Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">DPIA</p>
+          <h1>Sensor Dashboard</h1>
+        </div>
+        <button id="refreshBtn" class="primary-btn" type="button">Refresh</button>
+      </header>
+
+      <section class="charts-grid">
+        <article class="card chart-card">
+          <h2>Air Temperature (°C)</h2>
+          <canvas id="chart-air_temp"></canvas>
+        </article>
+        <article class="card chart-card">
+          <h2>Ground Temperature (°C)</h2>
+          <canvas id="chart-ground_temp"></canvas>
+        </article>
+        <article class="card chart-card">
+          <h2>Humidity (%)</h2>
+          <canvas id="chart-humidity"></canvas>
+        </article>
+        <article class="card chart-card">
+          <h2>Air Quality</h2>
+          <canvas id="chart-air_quality"></canvas>
+        </article>
+      </section>
+
+      <section class="bottom-dock">
+        <section class="card controls controls-card">
+          <h2>Data Filters</h2>
+          <form id="filterForm" class="filter-grid">
+            <label>
+              Start date/time
+              <input id="startInput" name="start" type="datetime-local" step="1" />
+            </label>
+            <label>
+              End date/time
+              <input id="endInput" name="end" type="datetime-local" step="1" />
+            </label>
+            <div class="filter-actions">
+              <button class="primary-btn" type="submit">Apply</button>
+              <button id="clearFiltersBtn" class="secondary-btn" type="button">Clear</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card current-card">
+          <h2>Current Reading</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Value</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="currentDataTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <template id="messageRowTemplate">
+      <tr>
+        <td colspan="3" class="message-cell"></td>
+      </tr>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

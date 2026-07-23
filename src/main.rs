@@ -17,7 +17,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, prelude::FromRow};
 use tokio::{net::TcpListener, signal};
-use tower_http::timeout::TimeoutLayer;
+use tower_http::{services::ServeDir, timeout::TimeoutLayer};
 use tracing::{info, instrument, level_filters::LevelFilter, warn};
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -57,6 +57,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let app = Router::new()
+        .fallback_service(ServeDir::new("./static").precompressed_br())
         .route("/data", post(submit_data))
         .route("/data", get(get_data))
         .route("/time", get(time))
