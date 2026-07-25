@@ -139,6 +139,28 @@ function showTableMessage(message) {
     currentDataTable.appendChild(row);
 }
 
+function setAllChartsXRange(min, max) {
+    charts.forEach((chart) => {
+        chart.options.scales.x.min = min;
+        chart.options.scales.x.max = max;
+        chart.update("none");
+    });
+}
+
+function setAllChartsXLimits(min, max) {
+    charts.forEach((chart) => {
+        chart.options.plugins.zoom.limits.x.min = min;
+        chart.options.plugins.zoom.limits.x.max = max;
+    });
+}
+
+function resetChartView(chart) {
+    if (defaultXMin === null || defaultXMax === null) return;
+    chart.options.scales.x.min = defaultXMin;
+    chart.options.scales.x.max = defaultXMax;
+    chart.update("none");
+}
+
 // -------------------------------------------------------------
 // 3. Chart options – now using a TIME scale and the exact
 //    pan/zoom configuration from the fixed example.
@@ -249,7 +271,7 @@ function createSingleMetricChart(metric) {
         ),
     });
     ctx.addEventListener("dblclick", () => {
-        chart.resetZoom();
+        resetChartView(chart);
     });
 
     charts.set(metric.key, chart);
@@ -285,6 +307,9 @@ function createAirQualityChart() {
         type: "line",
         data: { datasets },
         options: options,
+    });
+    ctx.addEventListener("dblclick", () => {
+        resetChartView(chart);
     });
 
     charts.set("air_quality", chart);
@@ -434,55 +459,77 @@ async function loadData() {
 
         const payload = await response.json();
         const data = normalizePayload(payload).filter(
-            (item) => item && typeof item === "object",
+            (item) => item && typeof item === "object"
         );
 
-        // Update charts with the new data
         updateCharts(data);
 
-        // Determine global min/max timestamps from the data
+        // 1. Determine global data min
         const timestamps = data
-            .map((item) => normalizeTimestamp(item.submitted_at))
-            .filter((ts) => Number.isFinite(ts));
+            .map(item => normalizeTimestamp(item.submitted_at))
+            .filter(ts => Number.isFinite(ts));
 
-        let globalMin, globalMax;
-        if (timestamps.length) {
-            globalMin = Math.min(...timestamps);
-            globalMax = Math.max(...timestamps);
+        const now = Date.now();
+        let globalMin = timestamps.length ? Math.min(...timestamps) : (now - ONE_DAY_SECONDS * 1000);
+
+        // 2. Global max = filter's end time, or current time
+        const endSeconds = filters.end ? Number(filters.end) : null;
+        const startSeconds = filters.start ? Number(filters.start) : null;
+
+        let globalMax;
+        if (endSeconds !== null && Number.isFinite(endSeconds)) {
+            globalMax = endSeconds * 1000;
         } else {
-            // Fallback: use the filter range or last 24h
-            const defaultRange = getPastDayRangeMs();
-            globalMin = defaultRange.min;
-            globalMax = defaultRange.max;
+            globalMax = now;   // ← always ends at current time
         }
+        if (globalMax < globalMin) globalMax = globalMin + ONE_MINUTE_MS;
 
-        // Set the zoom limits to the full data range (prevents panning beyond data)
+        // 3. Set pan/zoom limits to the full allowed range
         setAllChartsXLimits(globalMin, globalMax);
 
-        // Set the initial visible range:
-        // - if filters provide start/end, use those; otherwise show the full data range
-        const startSeconds = filters.start ? Number(filters.start) : null;
-        const endSeconds = filters.end ? Number(filters.end) : null;
-        let visibleMin = Number.isFinite(startSeconds)
-            ? startSeconds * 1000
-            : globalMin;
-        let visibleMax = Number.isFinite(endSeconds)
-            ? endSeconds * 1000
-            : globalMax;
+        // 4. Compute the default visible range
+        let visibleMin, visibleMax;
 
-        // Ensure the visible range is within the limits
+        if (startSeconds !== null && Number.isFinite(startSeconds)) {
+            visibleMin = startSeconds * 1000;
+        } else {
+            // No start filter → show the last 1 hour (or data start if later)
+            const oneHourAgo = now - 60 * 60 * 1000;
+            visibleMin = Math.max(globalMin, oneHourAgo);
+        }
+
+        if (endSeconds !== null && Number.isFinite(endSeconds)) {
+            visibleMax = endSeconds * 1000;
+        } else {
+            visibleMax = now;   // ← always ends at current time
+        }
+
+        // Safety: ensure visibleMin < visibleMax
+        if (visibleMin >= visibleMax) {
+            visibleMin = globalMin;
+            visibleMax = globalMax;
+        }
+
+        // Clamp to limits
         visibleMin = Math.max(visibleMin, globalMin);
         visibleMax = Math.min(visibleMax, globalMax);
+
+        // 5. Store this as the default (for double-click reset)
+        defaultXMin = visibleMin;
+        defaultXMax = visibleMax;
 
         setAllChartsXRange(visibleMin, visibleMax);
 
         updateCurrentTable(data);
     } catch (error) {
         showTableMessage(`Failed to load data: ${error.message}`);
-        // Reset to default range on error
-        const defaultRange = getPastDayRangeMs();
-        setAllChartsXRange(defaultRange.min, defaultRange.max);
-        setAllChartsXLimits(defaultRange.min, defaultRange.max);
+        // On error, reset to a safe default range
+        const now = Date.now();
+        const defaultMin = now - ONE_DAY_SECONDS * 1000;
+        defaultXMin = defaultMin;
+        defaultXMax = now;
+        setAllChartsXRange(defaultMin, now);
+        setAllChartsXLimits(defaultMin, now);
         updateCharts([]);
     }
 }
