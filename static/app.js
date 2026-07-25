@@ -2,12 +2,7 @@ const API_URL = "https://dpia.trevrosa.dev/data";
 
 const METRICS = [
     { key: "air_temp", label: "Air Temperature", unit: "°C", color: "#3366cc" },
-    {
-        key: "ground_temp",
-        label: "Ground Temperature",
-        unit: "°C",
-        color: "#ff7f0e",
-    },
+    { key: "ground_temp", label: "Ground Temperature", unit: "°C", color: "#ff7f0e" },
     { key: "humidity", label: "Humidity", unit: "%", color: "#2ca02c" },
     { key: "nox", label: "NOx Index", unit: "", color: "#9467bd" },
     { key: "voc", label: "VOC Index", unit: "", color: "#d62728" },
@@ -22,13 +17,12 @@ const Y_AXIS_DEFAULTS = {
     humidity: { min: 0, max: 100 },
 };
 const ONE_DAY_SECONDS = 24 * 60 * 60;
-const ONE_MINUTE_MS = 60;
-const POINTS_VISIBLE = 10;
-const PIXELS_PER_X_TICK = 50;
-const MIN_X_TICKS = 4;
-const MAX_X_TICKS = 20;
+const ONE_MINUTE_MS = 60_000;          // kept only for limits
+const MAX_GAP_MS = 120_000;
 
-// Register the zoom plugin (assumes ChartZoom is globally available)
+// -------------------------------------------------------------
+// 1. Register the zoom plugin globally
+// -------------------------------------------------------------
 if (typeof ChartZoom !== 'undefined') {
     Chart.register(ChartZoom);
 }
@@ -39,6 +33,9 @@ const filterForm = document.getElementById("filterForm");
 const refreshBtn = document.getElementById("refreshBtn");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 
+// -------------------------------------------------------------
+// 2. Helper functions (filters, timestamps, formatting)
+// -------------------------------------------------------------
 function getFilters() {
     const startInput = document.getElementById("startInput").value.trim();
     const endInput = document.getElementById("endInput").value.trim();
@@ -72,13 +69,6 @@ function toDateTimeLocalValue(milliseconds) {
 function getPastDayRangeMs() {
     const end = Date.now();
     return { min: end - ONE_DAY_SECONDS * 1000, max: end };
-}
-
-function getResponsiveMaxTicks(width) {
-    return Math.max(
-        MIN_X_TICKS,
-        Math.min(MAX_X_TICKS, Math.floor(width / PIXELS_PER_X_TICK)),
-    );
 }
 
 function setDefaultDateRange() {
@@ -144,6 +134,10 @@ function showTableMessage(message) {
     currentDataTable.appendChild(row);
 }
 
+// -------------------------------------------------------------
+// 3. Chart options – now using a TIME scale and the exact
+//    pan/zoom configuration from the fixed example.
+// -------------------------------------------------------------
 function getChartOptions(showLegend, yRange, yUnit) {
     const defaultRange = getPastDayRangeMs();
     return {
@@ -151,11 +145,6 @@ function getChartOptions(showLegend, yRange, yUnit) {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
-        onResize(chart, size) {
-            chart.options.scales.x.ticks.maxTicksLimit = getResponsiveMaxTicks(
-                size.width,
-            );
-        },
         plugins: {
             legend: { display: showLegend },
             tooltip: {
@@ -168,13 +157,11 @@ function getChartOptions(showLegend, yRange, yUnit) {
                         const base = context.dataset.label || "";
                         const value = context.parsed?.y;
                         if (value === null || value === undefined) return base;
-                        return yUnit
-                            ? `${base}: ${value} ${yUnit}`
-                            : `${base}: ${value}`;
+                        return yUnit ? `${base}: ${value} ${yUnit}` : `${base}: ${value}`;
                     },
                 },
             },
-            // Zoom & pan configuration – only on x‑axis
+            // Pan & zoom – exactly as in the fixed example
             zoom: {
                 pan: {
                     enabled: true,
@@ -192,29 +179,28 @@ function getChartOptions(showLegend, yRange, yUnit) {
                     },
                     mode: 'x',
                 },
+                // Limits are set dynamically after data loads (see below)
                 limits: {
                     x: {
-                        minRange: ONE_MINUTE_MS * 1000, // prevent zooming to less than 1 minute
+                        minRange: ONE_MINUTE_MS, // prevent zooming below 1 minute
                     }
                 }
             }
         },
         scales: {
             x: {
-                type: "linear",
-                min: defaultRange.min,
-                max: defaultRange.max,
-                ticks: {
-                    autoSkip: false,
-                    maxRotation: 0,
-                    minRotation: 0,
-                    padding: 12,
-                    stepSize: getResponsiveMaxTicks(window.innerWidth) / 60,
-                    maxTicksLimit: getResponsiveMaxTicks(window.innerWidth),
-                    callback(value) {
-                        return formatTimeOnly(value);
+                type: 'time',                // ← now using time scale
+                // initial min/max set later
+                time: {
+                    unit: 'minute',          // optional, let Chart.js auto‑adjust
+                    displayFormats: {
+                        minute: 'HH:mm:ss',
                     },
                 },
+                grid: {
+                    color: 'rgba(0,0,0,0.05)',
+                },
+                // No custom tick options – let Chart.js handle everything
             },
             y: {
                 min: yRange?.min,
@@ -226,6 +212,9 @@ function getChartOptions(showLegend, yRange, yUnit) {
     };
 }
 
+// -------------------------------------------------------------
+// 4. Chart creation functions (unchanged except options)
+// -------------------------------------------------------------
 function createSingleMetricChart(metric) {
     const ctx = document.getElementById(`chart-${metric.key}`);
     if (!ctx) return;
@@ -233,29 +222,22 @@ function createSingleMetricChart(metric) {
     const chart = new Chart(ctx, {
         type: "line",
         data: {
-            datasets: [
-                {
-                    label: metric.label,
-                    data: [],
-                    borderColor: metric.color,
-                    backgroundColor: `${metric.color}22`,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
-                    tension: 0.25,
-                    spanGaps: false,
-                },
-            ],
+            datasets: [{
+                label: metric.label,
+                data: [],
+                borderColor: metric.color,
+                backgroundColor: `${metric.color}22`,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.25,
+                spanGaps: false,
+            }],
         },
-        options: getChartOptions(
-            false,
-            Y_AXIS_DEFAULTS[metric.key],
-            metric.unit,
-        ),
+        options: getChartOptions(false, Y_AXIS_DEFAULTS[metric.key], metric.unit),
     });
 
     charts.set(metric.key, chart);
-    // No custom dragging – zoom plugin handles pan/zoom
 }
 
 function createAirQualityChart() {
@@ -291,7 +273,6 @@ function createAirQualityChart() {
     });
 
     charts.set("air_quality", chart);
-    // No custom dragging – zoom plugin handles pan/zoom
 }
 
 function initializeCharts() {
@@ -302,45 +283,106 @@ function initializeCharts() {
     createAirQualityChart();
 }
 
-function updateCharts(data) {
-    const sorted = [...data].sort(
-        (a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0),
-    );
+// -------------------------------------------------------------
+// 5. Updating charts with data (unchanged)
+// -------------------------------------------------------------
+// function updateCharts(data) {
+//     const sorted = [...data].sort((a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0));
 
+//     INDIVIDUAL_CHART_METRICS.forEach((key) => {
+//         const metric = METRICS.find((item) => item.key === key);
+//         if (!metric) return;
+//         const chart = charts.get(metric.key);
+//         if (!chart) return;
+//         chart.data.datasets[0].data = sorted
+//             .filter(item => item[metric.key] !== null && item[metric.key] !== undefined)
+//             .map(item => {
+//                 const x = normalizeTimestamp(item.submitted_at);
+//                 return x ? { x, y: item[metric.key] } : null;
+//             })
+//             .filter(Boolean);
+//         chart.update();
+//     });
+
+//     const airQualityChart = charts.get("air_quality");
+//     if (airQualityChart) {
+//         AIR_QUALITY_METRICS.forEach((key, index) => {
+//             airQualityChart.data.datasets[index].data = sorted
+//                 .filter(item => item[key] !== null && item[key] !== undefined)
+//                 .map(item => {
+//                     const x = normalizeTimestamp(item.submitted_at);
+//                     return x ? { x, y: item[key] } : null;
+//                 })
+//                 .filter(Boolean);
+//         });
+//         airQualityChart.update();
+//     }
+// }
+function breakGaps(points, maxGapMs) {
+    if (points.length < 2) return points.slice();
+    const result = [];
+    for (let i = 0; i < points.length - 1; i++) {
+        result.push(points[i]);
+        const gap = points[i + 1].x - points[i].x;
+        if (gap > maxGapMs) {
+            // Insert a null point to break the line immediately after points[i]
+            result.push({ x: points[i].x, y: null });
+        }
+    }
+    result.push(points[points.length - 1]);
+    return result;
+}
+function updateCharts(data) {
+    const sorted = [...data].sort((a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0));
+
+    // Update individual charts
     INDIVIDUAL_CHART_METRICS.forEach((key) => {
         const metric = METRICS.find((item) => item.key === key);
         if (!metric) return;
         const chart = charts.get(metric.key);
         if (!chart) return;
-        chart.data.datasets[0].data = sorted
-            .filter(
-                (item) =>
-                    item[metric.key] !== null && item[metric.key] !== undefined,
-            )
-            .map((item) => {
+
+        // Build raw points (filter out null/undefined values)
+        let points = sorted
+            .filter(item => item[metric.key] !== null && item[metric.key] !== undefined)
+            .map(item => {
                 const x = normalizeTimestamp(item.submitted_at);
                 return x ? { x, y: item[metric.key] } : null;
             })
             .filter(Boolean);
+
+        // Break gaps if they exceed the threshold
+        points = breakGaps(points, MAX_GAP_MS);
+
+        chart.data.datasets[0].data = points;
         chart.update();
     });
 
+    // Update air quality chart (multi-dataset)
     const airQualityChart = charts.get("air_quality");
     if (airQualityChart) {
         AIR_QUALITY_METRICS.forEach((key, index) => {
-            airQualityChart.data.datasets[index].data = sorted
-                .filter((item) => item[key] !== null && item[key] !== undefined)
-                .map((item) => {
+            let points = sorted
+                .filter(item => item[key] !== null && item[key] !== undefined)
+                .map(item => {
                     const x = normalizeTimestamp(item.submitted_at);
                     return x ? { x, y: item[key] } : null;
                 })
                 .filter(Boolean);
+
+            points = breakGaps(points, MAX_GAP_MS);
+
+            airQualityChart.data.datasets[index].data = points;
         });
         airQualityChart.update();
     }
 }
 
-function applyXAxisRange(min, max) {
+// -------------------------------------------------------------
+// 6. Setting the visible x axis range and limits
+//    (simplified: no custom "visible points" logic)
+// -------------------------------------------------------------
+function setAllChartsXRange(min, max) {
     charts.forEach((chart) => {
         chart.options.scales.x.min = min;
         chart.options.scales.x.max = max;
@@ -348,44 +390,16 @@ function applyXAxisRange(min, max) {
     });
 }
 
-function getVisibleDataRange(data) {
-    const timestamps = data
-        .map((item) => normalizeTimestamp(item.submitted_at))
-        .filter((ts) => Number.isFinite(ts))
-        .sort((a, b) => a - b);
-
-    if (!timestamps.length) return null;
-
-    if (timestamps.length >= POINTS_VISIBLE) {
-        const max = timestamps[timestamps.length - 1];
-        const min = timestamps[timestamps.length - POINTS_VISIBLE];
-        if (min === max) {
-            return { min: max - ONE_MINUTE_MS * (POINTS_VISIBLE - 1), max };
-        }
-        return { min, max };
-    }
-
-    const min = timestamps[0];
-    const max = timestamps[timestamps.length - 1];
-    if (min === max) {
-        return { min: max - ONE_MINUTE_MS * (POINTS_VISIBLE - 1), max };
-    }
-    return { min, max };
+function setAllChartsXLimits(min, max) {
+    charts.forEach((chart) => {
+        chart.options.plugins.zoom.limits.x.min = min;
+        chart.options.plugins.zoom.limits.x.max = max;
+    });
 }
 
-function applyXAxisRangeFromFilters(filters) {
-    const startSeconds = filters.start ? Number(filters.start) : null;
-    const endSeconds = filters.end ? Number(filters.end) : null;
-    const defaultRange = getPastDayRangeMs();
-    const min = Number.isFinite(startSeconds)
-        ? startSeconds * 1000
-        : defaultRange.min;
-    const max = Number.isFinite(endSeconds)
-        ? endSeconds * 1000
-        : defaultRange.max;
-    applyXAxisRange(min, max);
-}
-
+// -------------------------------------------------------------
+// 7. Current data table (unchanged)
+// -------------------------------------------------------------
 function updateCurrentTable(data) {
     if (!data.length) {
         showTableMessage("No sensor data available for this filter.");
@@ -408,6 +422,9 @@ function updateCurrentTable(data) {
     });
 }
 
+// -------------------------------------------------------------
+// 8. Main data loading – now sets range & limits from the data
+// -------------------------------------------------------------
 async function loadData() {
     const filters = getFilters();
     const url = buildUrl(filters);
@@ -421,25 +438,57 @@ async function loadData() {
         }
 
         const payload = await response.json();
-        const data = normalizePayload(payload).filter(
-            (item) => item && typeof item === "object",
-        );
+        const data = normalizePayload(payload).filter(item => item && typeof item === "object");
 
+        // Update charts with the new data
         updateCharts(data);
-        const dataRange = getVisibleDataRange(data);
-        if (dataRange) {
-            applyXAxisRange(dataRange.min, dataRange.max);
+
+        // Determine global min/max timestamps from the data
+        const timestamps = data
+            .map(item => normalizeTimestamp(item.submitted_at))
+            .filter(ts => Number.isFinite(ts));
+
+        let globalMin, globalMax;
+        if (timestamps.length) {
+            globalMin = Math.min(...timestamps);
+            globalMax = Math.max(...timestamps);
         } else {
-            applyXAxisRangeFromFilters(filters);
+            // Fallback: use the filter range or last 24h
+            const defaultRange = getPastDayRangeMs();
+            globalMin = defaultRange.min;
+            globalMax = defaultRange.max;
         }
+
+        // Set the zoom limits to the full data range (prevents panning beyond data)
+        setAllChartsXLimits(globalMin, globalMax);
+
+        // Set the initial visible range:
+        // - if filters provide start/end, use those; otherwise show the full data range
+        const startSeconds = filters.start ? Number(filters.start) : null;
+        const endSeconds = filters.end ? Number(filters.end) : null;
+        let visibleMin = Number.isFinite(startSeconds) ? startSeconds * 1000 : globalMin;
+        let visibleMax = Number.isFinite(endSeconds) ? endSeconds * 1000 : globalMax;
+
+        // Ensure the visible range is within the limits
+        visibleMin = Math.max(visibleMin, globalMin);
+        visibleMax = Math.min(visibleMax, globalMax);
+
+        setAllChartsXRange(visibleMin, visibleMax);
+
         updateCurrentTable(data);
     } catch (error) {
         showTableMessage(`Failed to load data: ${error.message}`);
-        applyXAxisRangeFromFilters(filters);
+        // Reset to default range on error
+        const defaultRange = getPastDayRangeMs();
+        setAllChartsXRange(defaultRange.min, defaultRange.max);
+        setAllChartsXLimits(defaultRange.min, defaultRange.max);
         updateCharts([]);
     }
 }
 
+// -------------------------------------------------------------
+// 9. Event listeners (unchanged)
+// -------------------------------------------------------------
 filterForm.addEventListener("submit", (event) => {
     event.preventDefault();
     loadData();
@@ -452,6 +501,9 @@ clearFiltersBtn.addEventListener("click", () => {
 
 refreshBtn.addEventListener("click", loadData);
 
+// -------------------------------------------------------------
+// 10. Initialise
+// -------------------------------------------------------------
 setDefaultDateRange();
 initializeCharts();
 loadData();
