@@ -2,7 +2,12 @@ const API_URL = "https://dpia.trevrosa.dev/data";
 
 const METRICS = [
     { key: "air_temp", label: "Air Temperature", unit: "°C", color: "#3366cc" },
-    { key: "ground_temp", label: "Ground Temperature", unit: "°C", color: "#ff7f0e" },
+    {
+        key: "ground_temp",
+        label: "Ground Temperature",
+        unit: "°C",
+        color: "#ff7f0e",
+    },
     { key: "humidity", label: "Humidity", unit: "%", color: "#2ca02c" },
     { key: "nox", label: "NOx Index", unit: "", color: "#9467bd" },
     { key: "voc", label: "VOC Index", unit: "", color: "#d62728" },
@@ -17,13 +22,13 @@ const Y_AXIS_DEFAULTS = {
     humidity: { min: 0, max: 100 },
 };
 const ONE_DAY_SECONDS = 24 * 60 * 60;
-const ONE_MINUTE_MS = 60_000;          // kept only for limits
-const MAX_GAP_MS = 120_000;
+const ZOOM_LIMIT_MS = 5 * 60 * 1000;
+const MAX_GAP_MS = 10 * 60 * 1000;
 
 // -------------------------------------------------------------
 // 1. Register the zoom plugin globally
 // -------------------------------------------------------------
-if (typeof ChartZoom !== 'undefined') {
+if (typeof ChartZoom !== "undefined") {
     Chart.register(ChartZoom);
 }
 
@@ -157,7 +162,9 @@ function getChartOptions(showLegend, yRange, yUnit) {
                         const base = context.dataset.label || "";
                         const value = context.parsed?.y;
                         if (value === null || value === undefined) return base;
-                        return yUnit ? `${base}: ${value} ${yUnit}` : `${base}: ${value}`;
+                        return yUnit
+                            ? `${base}: ${value} ${yUnit}`
+                            : `${base}: ${value}`;
                     },
                 },
             },
@@ -165,7 +172,7 @@ function getChartOptions(showLegend, yRange, yUnit) {
             zoom: {
                 pan: {
                     enabled: true,
-                    mode: 'x',
+                    mode: "x",
                     modifierKey: null,
                 },
                 zoom: {
@@ -177,30 +184,29 @@ function getChartOptions(showLegend, yRange, yUnit) {
                     pinch: {
                         enabled: true,
                     },
-                    mode: 'x',
+                    mode: "x",
                 },
                 // Limits are set dynamically after data loads (see below)
                 limits: {
                     x: {
-                        minRange: ONE_MINUTE_MS, // prevent zooming below 1 minute
-                    }
-                }
-            }
+                        minRange: ZOOM_LIMIT_MS, // prevent zooming below this scale
+                    },
+                },
+            },
         },
         scales: {
             x: {
-                type: 'time',                // ← now using time scale
+                type: "time",
                 // initial min/max set later
                 time: {
-                    unit: 'minute',          // optional, let Chart.js auto‑adjust
+                    // unit: "",
                     displayFormats: {
-                        minute: 'HH:mm:ss',
+                        minute: "HH:mm",
                     },
                 },
                 grid: {
-                    color: 'rgba(0,0,0,0.05)',
+                    color: "rgba(0,0,0,0.05)",
                 },
-                // No custom tick options – let Chart.js handle everything
             },
             y: {
                 min: yRange?.min,
@@ -222,19 +228,28 @@ function createSingleMetricChart(metric) {
     const chart = new Chart(ctx, {
         type: "line",
         data: {
-            datasets: [{
-                label: metric.label,
-                data: [],
-                borderColor: metric.color,
-                backgroundColor: `${metric.color}22`,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                tension: 0.25,
-                spanGaps: false,
-            }],
+            datasets: [
+                {
+                    label: metric.label,
+                    data: [],
+                    borderColor: metric.color,
+                    backgroundColor: `${metric.color}22`,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.25,
+                    spanGaps: false,
+                },
+            ],
         },
-        options: getChartOptions(false, Y_AXIS_DEFAULTS[metric.key], metric.unit),
+        options: getChartOptions(
+            false,
+            Y_AXIS_DEFAULTS[metric.key],
+            metric.unit,
+        ),
+    });
+    ctx.addEventListener("dblclick", () => {
+        chart.resetZoom();
     });
 
     charts.set(metric.key, chart);
@@ -259,7 +274,7 @@ function createAirQualityChart() {
         };
     });
 
-    let options = getChartOptions(true);
+    let options = getChartOptions(true, { min: 1, max: 500 });
     options.scales.y1 = {
         type: "linear",
         display: true,
@@ -286,38 +301,6 @@ function initializeCharts() {
 // -------------------------------------------------------------
 // 5. Updating charts with data (unchanged)
 // -------------------------------------------------------------
-// function updateCharts(data) {
-//     const sorted = [...data].sort((a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0));
-
-//     INDIVIDUAL_CHART_METRICS.forEach((key) => {
-//         const metric = METRICS.find((item) => item.key === key);
-//         if (!metric) return;
-//         const chart = charts.get(metric.key);
-//         if (!chart) return;
-//         chart.data.datasets[0].data = sorted
-//             .filter(item => item[metric.key] !== null && item[metric.key] !== undefined)
-//             .map(item => {
-//                 const x = normalizeTimestamp(item.submitted_at);
-//                 return x ? { x, y: item[metric.key] } : null;
-//             })
-//             .filter(Boolean);
-//         chart.update();
-//     });
-
-//     const airQualityChart = charts.get("air_quality");
-//     if (airQualityChart) {
-//         AIR_QUALITY_METRICS.forEach((key, index) => {
-//             airQualityChart.data.datasets[index].data = sorted
-//                 .filter(item => item[key] !== null && item[key] !== undefined)
-//                 .map(item => {
-//                     const x = normalizeTimestamp(item.submitted_at);
-//                     return x ? { x, y: item[key] } : null;
-//                 })
-//                 .filter(Boolean);
-//         });
-//         airQualityChart.update();
-//     }
-// }
 function breakGaps(points, maxGapMs) {
     if (points.length < 2) return points.slice();
     const result = [];
@@ -333,7 +316,9 @@ function breakGaps(points, maxGapMs) {
     return result;
 }
 function updateCharts(data) {
-    const sorted = [...data].sort((a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0));
+    const sorted = [...data].sort(
+        (a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0),
+    );
 
     // Update individual charts
     INDIVIDUAL_CHART_METRICS.forEach((key) => {
@@ -344,8 +329,11 @@ function updateCharts(data) {
 
         // Build raw points (filter out null/undefined values)
         let points = sorted
-            .filter(item => item[metric.key] !== null && item[metric.key] !== undefined)
-            .map(item => {
+            .filter(
+                (item) =>
+                    item[metric.key] !== null && item[metric.key] !== undefined,
+            )
+            .map((item) => {
                 const x = normalizeTimestamp(item.submitted_at);
                 return x ? { x, y: item[metric.key] } : null;
             })
@@ -356,6 +344,9 @@ function updateCharts(data) {
 
         chart.data.datasets[0].data = points;
         chart.update();
+        setTimeout(() => {
+            chart.resetZoom();
+        }, 200);
     });
 
     // Update air quality chart (multi-dataset)
@@ -363,8 +354,8 @@ function updateCharts(data) {
     if (airQualityChart) {
         AIR_QUALITY_METRICS.forEach((key, index) => {
             let points = sorted
-                .filter(item => item[key] !== null && item[key] !== undefined)
-                .map(item => {
+                .filter((item) => item[key] !== null && item[key] !== undefined)
+                .map((item) => {
                     const x = normalizeTimestamp(item.submitted_at);
                     return x ? { x, y: item[key] } : null;
                 })
@@ -375,6 +366,10 @@ function updateCharts(data) {
             airQualityChart.data.datasets[index].data = points;
         });
         airQualityChart.update();
+        airQualityChart.resetZoom();
+        setTimeout(() => {
+            airQualityChart.resetZoom();
+        }, 200);
     }
 }
 
@@ -438,15 +433,17 @@ async function loadData() {
         }
 
         const payload = await response.json();
-        const data = normalizePayload(payload).filter(item => item && typeof item === "object");
+        const data = normalizePayload(payload).filter(
+            (item) => item && typeof item === "object",
+        );
 
         // Update charts with the new data
         updateCharts(data);
 
         // Determine global min/max timestamps from the data
         const timestamps = data
-            .map(item => normalizeTimestamp(item.submitted_at))
-            .filter(ts => Number.isFinite(ts));
+            .map((item) => normalizeTimestamp(item.submitted_at))
+            .filter((ts) => Number.isFinite(ts));
 
         let globalMin, globalMax;
         if (timestamps.length) {
@@ -466,8 +463,12 @@ async function loadData() {
         // - if filters provide start/end, use those; otherwise show the full data range
         const startSeconds = filters.start ? Number(filters.start) : null;
         const endSeconds = filters.end ? Number(filters.end) : null;
-        let visibleMin = Number.isFinite(startSeconds) ? startSeconds * 1000 : globalMin;
-        let visibleMax = Number.isFinite(endSeconds) ? endSeconds * 1000 : globalMax;
+        let visibleMin = Number.isFinite(startSeconds)
+            ? startSeconds * 1000
+            : globalMin;
+        let visibleMax = Number.isFinite(endSeconds)
+            ? endSeconds * 1000
+            : globalMax;
 
         // Ensure the visible range is within the limits
         visibleMin = Math.max(visibleMin, globalMin);
@@ -499,7 +500,13 @@ clearFiltersBtn.addEventListener("click", () => {
     loadData();
 });
 
-refreshBtn.addEventListener("click", loadData);
+refreshBtn.addEventListener("click", () => {
+    const endSeconds = Math.floor(Date.now() / 1000);
+    document.getElementById("endInput").value = toDateTimeLocalValue(
+        endSeconds * 1000,
+    );
+    loadData();
+});
 
 // -------------------------------------------------------------
 // 10. Initialise
