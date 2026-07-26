@@ -25,12 +25,35 @@ const ONE_DAY_SECONDS = 24 * 60 * 60;
 const ZOOM_LIMIT_MS = 5 * 60 * 1000;
 const MAX_GAP_MS = 10 * 60 * 1000;
 
+let crosshairTimestamp = null;
+
+const crosshairPlugin = {
+    id: "crosshair",
+    afterDraw(chart, args, options) {
+        if (crosshairTimestamp === null) return;
+        const xScale = chart.scales.x;
+        if (!xScale) return;
+        const xPixel = xScale.getPixelForValue(crosshairTimestamp);
+        const chartArea = chart.chartArea;
+        if (xPixel < chartArea.left || xPixel > chartArea.right) return;
+
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.strokeStyle = "#F66";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(xPixel, chartArea.top);
+        ctx.lineTo(xPixel, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+    },
+};
+
 // -------------------------------------------------------------
-// 1. Register the zoom plugin globally
+// 1. Register plugins
 // -------------------------------------------------------------
-if (typeof ChartZoom !== "undefined") {
-    Chart.register(ChartZoom);
-}
+Chart.register(crosshairPlugin);
+Chart.register(ChartZoom);
 
 const charts = new Map();
 const currentDataTable = document.getElementById("currentDataTable");
@@ -51,6 +74,50 @@ function getFilters() {
         ...(start ? { start } : {}),
         ...(end ? { end } : {}),
     };
+}
+
+function syncCrosshair(event, timestamp) {
+    crosshairTimestamp = timestamp;
+    charts.forEach((chart) => {
+        // Use Chart.js' builtin method to get elements under the mouse
+        const elements = chart.getElementsAtEventForMode(event, 'index', { intersect: false });
+        console.log(chart.canvas.id, elements)
+        if (elements && elements.length) {
+            chart.setActiveElements(elements);
+        } else {
+            chart.setActiveElements([]);
+        }
+        chart.tooltip.update();
+        chart.draw(); // redraw to show crosshair line
+    });
+}
+
+function clearCrosshair() {
+    crosshairTimestamp = null;
+    charts.forEach((chart) => {
+        chart.setActiveElements([]);
+        chart.tooltip.update();
+        chart.draw();
+    });
+}
+
+function clearCrosshair() {
+    crosshairTimestamp = null;
+    charts.forEach((chart) => {
+        chart.setActiveElements([]);
+        chart.tooltip.update();
+        chart.draw();
+    });
+}
+
+function getTimestampFromEvent(chart, event) {
+    const rect = chart.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const xScale = chart.scales.x;
+    if (!xScale) return null;
+    const chartArea = chart.chartArea;
+    if (x < chartArea.left || x > chartArea.right) return null;
+    return xScale.getValueForPixel(x);
 }
 
 function toUnixSeconds(dateTimeValue) {
@@ -143,7 +210,7 @@ function setAllChartsXRange(min, max) {
     charts.forEach((chart) => {
         chart.options.scales.x.min = min;
         chart.options.scales.x.max = max;
-        chart.update("none");
+        chart.update();
     });
 }
 
@@ -158,7 +225,7 @@ function resetChartView(chart) {
     if (defaultXMin === null || defaultXMax === null) return;
     chart.options.scales.x.min = defaultXMin;
     chart.options.scales.x.max = defaultXMax;
-    chart.update("none");
+    chart.update();
 }
 
 // -------------------------------------------------------------
@@ -175,6 +242,7 @@ function getChartOptions(showLegend, yRange, yUnit) {
         plugins: {
             legend: { display: showLegend },
             tooltip: {
+                enabled: true,
                 callbacks: {
                     title(items) {
                         if (!items.length) return "";
@@ -270,6 +338,13 @@ function createSingleMetricChart(metric) {
             metric.unit,
         ),
     });
+    chart.canvas.addEventListener("mousemove", (e) => {
+        const timestamp = getTimestampFromEvent(chart, e);
+        if (timestamp !== null && timestamp !== undefined) {
+            syncCrosshair(e, timestamp);
+        }
+    });
+    chart.canvas.addEventListener("mouseleave", clearCrosshair);
     ctx.addEventListener("dblclick", () => {
         resetChartView(chart);
     });
@@ -308,6 +383,13 @@ function createAirQualityChart() {
         data: { datasets },
         options: options,
     });
+    chart.canvas.addEventListener("mousemove", (e) => {
+        const timestamp = getTimestampFromEvent(chart, e);
+        if (timestamp !== null && timestamp !== undefined) {
+            syncCrosshair(e, timestamp);
+        }
+    });
+    chart.canvas.addEventListener("mouseleave", clearCrosshair);
     ctx.addEventListener("dblclick", () => {
         resetChartView(chart);
     });
@@ -459,18 +541,20 @@ async function loadData() {
 
         const payload = await response.json();
         const data = normalizePayload(payload).filter(
-            (item) => item && typeof item === "object"
+            (item) => item && typeof item === "object",
         );
 
         updateCharts(data);
 
         // 1. Determine global data min
         const timestamps = data
-            .map(item => normalizeTimestamp(item.submitted_at))
-            .filter(ts => Number.isFinite(ts));
+            .map((item) => normalizeTimestamp(item.submitted_at))
+            .filter((ts) => Number.isFinite(ts));
 
         const now = Date.now();
-        let globalMin = timestamps.length ? Math.min(...timestamps) : (now - ONE_DAY_SECONDS * 1000);
+        let globalMin = timestamps.length
+            ? Math.min(...timestamps)
+            : now - ONE_DAY_SECONDS * 1000;
 
         // 2. Global max = filter's end time, or current time
         const endSeconds = filters.end ? Number(filters.end) : null;
@@ -480,7 +564,7 @@ async function loadData() {
         if (endSeconds !== null && Number.isFinite(endSeconds)) {
             globalMax = endSeconds * 1000;
         } else {
-            globalMax = now;   // ← always ends at current time
+            globalMax = now; // ← always ends at current time
         }
         if (globalMax < globalMin) globalMax = globalMin + ONE_MINUTE_MS;
 
@@ -501,7 +585,7 @@ async function loadData() {
         if (endSeconds !== null && Number.isFinite(endSeconds)) {
             visibleMax = endSeconds * 1000;
         } else {
-            visibleMax = now;   // ← always ends at current time
+            visibleMax = now; // ← always ends at current time
         }
 
         // Safety: ensure visibleMin < visibleMax
