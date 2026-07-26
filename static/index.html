@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DPIA Sensor Dashboard</title>
     <link rel="stylesheet" href="./styles.css" />
-
     <!-- Chart.js core -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <!-- Hammer.js (required for touch gestures) -->
@@ -17,14 +16,12 @@
   </head>
   <body>
     <main class="container">
-      <!-- Header with filters on the right -->
+      <!-- Header with filters -->
       <header class="page-header">
         <div>
           <p class="eyebrow">DPIA</p>
           <h1>Sensor Dashboard</h1>
         </div>
-
-        <!-- Filter form and refresh button, now inline in the header -->
         <div class="header-controls">
           <form id="filterForm" class="filter-inline">
             <label>
@@ -43,7 +40,13 @@
         </div>
       </header>
 
-      <!-- Charts grid (unchanged) -->
+      <!-- Dashboard gauges -->
+      <section class="metrics-dashboard">
+        <h2>Live Readings</h2>
+        <div class="gauge-grid" id="gaugeGrid"></div>
+      </section>
+
+      <!-- Charts grid -->
       <section class="charts-grid">
         <article class="card chart-card">
           <h2>Air Temperature (°C)</h2>
@@ -62,15 +65,7 @@
           <canvas id="chart-air_quality"></canvas>
         </article>
       </section>
-
-      <!-- Bottom dock removed entirely -->
     </main>
-
-    <template id="messageRowTemplate">
-      <tr>
-        <td colspan="3" class="message-cell"></td>
-      </tr>
-    </template>
 
     <script src="./app.js"></script>
   </body>

@@ -25,14 +25,20 @@ const ONE_DAY_SECONDS = 24 * 60 * 60;
 const ZOOM_LIMIT_MS = 5 * 60 * 1000;
 const MAX_GAP_MS = 10 * 60 * 1000;
 
-// Default view range (for doubleclick reset)
+// Gauge ranges (same as chart Y axes)
+const GAUGE_RANGES = {
+    air_temp: { min: 10, max: 40, unit: "°C" },
+    ground_temp: { min: 20, max: 60, unit: "°C" },
+    humidity: { min: 0, max: 100, unit: "%" },
+    nox: { min: 0, max: 10, unit: "" },
+    voc: { min: 0, max: 10, unit: "" },
+    pm10: { min: 0, max: 500, unit: "ug/m3" },
+    pm25: { min: 0, max: 500, unit: "ug/m3" },
+};
+
 let defaultXMin = null;
 let defaultXMax = null;
-
-// Crosshair state
 let crosshairTimestamp = null;
-
-// Autorefresh state
 let autoRefreshInterval = null;
 let lastUpdateTime = null;
 let countdownInterval = null;
@@ -72,7 +78,7 @@ const refreshBtn = document.getElementById("refreshBtn");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 
 // ---------------------------------------------------------------------
-// Helpers: filters, timestamps, formatting
+// Helpers
 // ---------------------------------------------------------------------
 function getFilters() {
     const startInput = document.getElementById("startInput").value.trim();
@@ -221,17 +227,15 @@ function resetChartView(chart) {
 }
 
 // ---------------------------------------------------------------------
-// Autorefresh status display
+// Autorefresh status
 // ---------------------------------------------------------------------
 function updateStatus() {
     const statusEl = document.getElementById("updateStatus");
     if (!statusEl) return;
-
     if (lastUpdateTime === null) {
         statusEl.textContent = "Last update: --";
         return;
     }
-
     const now = Date.now();
     const diff = Math.floor((now - lastUpdateTime) / 1000);
     if (diff < 60) {
@@ -249,7 +253,6 @@ function startCountdown() {
         const statusEl = document.getElementById("updateStatus");
         if (!statusEl) return;
         if (nextRefreshTime === null) return;
-
         const now = Date.now();
         const remaining = Math.max(
             0,
@@ -262,13 +265,7 @@ function startCountdown() {
         }
     }, 1000);
 }
-function refresh() {
-    const endSeconds = Math.floor(Date.now() / 1000);
-    document.getElementById("endInput").value = toDateTimeLocalValue(
-        endSeconds * 1000,
-    );
-    loadData();
-}
+
 function startAutoRefresh() {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     autoRefreshInterval = setInterval(refresh, 30000);
@@ -282,6 +279,127 @@ function restartAutoRefresh() {
         updateStatus();
         startCountdown();
     }
+}
+
+// ---------------------------------------------------------------------
+// Gauge functions
+// ---------------------------------------------------------------------
+function createGaugeCards() {
+    const grid = document.getElementById("gaugeGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    METRICS.forEach((metric) => {
+        const card = document.createElement("div");
+        card.className = "gauge-card";
+        card.id = `gauge-${metric.key}`;
+        card.innerHTML = `
+            <h3>${metric.label}</h3>
+            <canvas id="gaugeCanvas-${metric.key}" width="160" height="160"></canvas>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function drawGauge(canvasId, value, min, max, unit) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.warn(`Canvas not found: ${canvasId}`);
+        return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) * 0.42;
+    const lineWidth = 10;
+
+    const clamped = Math.min(Math.max(value, min), max);
+    const percent = (clamped - min) / (max - min);
+
+    // Full circle from 12 o'clock ( -PI/2 ) clockwise
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + 2 * Math.PI;
+    const currentAngle = startAngle + 2 * Math.PI * percent;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Background arc (full circle)
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.strokeStyle = "#e0e5ec";
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // Foreground arc (progress)
+    if (percent > 0) {
+        const gradient = ctx.createLinearGradient(0, 0, width, 0);
+        gradient.addColorStop(0, "#2f6fed");
+        gradient.addColorStop(1, "#66b3ff");
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, currentAngle);
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = "round";
+        ctx.stroke();
+    }
+
+    // Center label: numeric value
+    ctx.fillStyle = "#152238";
+    ctx.font = "bold 28px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(clamped.toFixed(1), centerX, centerY - 4);
+
+    // Unit below value (smaller)
+    ctx.fillStyle = "#5b6b83";
+    ctx.font = "14px Inter, sans-serif";
+    ctx.fillText(unit, centerX, centerY + 24);
+}
+
+function updateGauges(data) {
+    if (!data || !data.length) {
+        // Clear gauges
+        METRICS.forEach((metric) => {
+            const canvas = document.getElementById(`gaugeCanvas-${metric.key}`);
+            if (canvas) {
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+        return;
+    }
+
+    const latest = data.reduce((a, b) =>
+        a.submitted_at > b.submitted_at ? a : b
+    );
+
+    METRICS.forEach((metric) => {
+        const value = latest[metric.key];
+        if (value === null || value === undefined) return;
+        const range = GAUGE_RANGES[metric.key];
+        if (!range) return;
+        drawGauge(
+            `gaugeCanvas-${metric.key}`,
+            value,
+            range.min,
+            range.max,
+            range.unit
+        );
+    });
+}
+
+// ---------------------------------------------------------------------
+// Refresh function (updates end time to now)
+// ---------------------------------------------------------------------
+function refresh() {
+    const endSeconds = Math.floor(Date.now() / 1000);
+    document.getElementById("endInput").value = toDateTimeLocalValue(
+        endSeconds * 1000,
+    );
+    loadData();
 }
 
 // ---------------------------------------------------------------------
@@ -322,7 +440,7 @@ function getChartOptions(showLegend, yRange, yUnit) {
                     wheel: {
                         enabled: true,
                         speed: 0.05,
-                        modifierKey: null,
+                        modifierKey: "shift",
                     },
                     pinch: { enabled: true },
                     mode: "x",
@@ -469,7 +587,7 @@ function breakGaps(points, maxGapMs) {
 }
 
 // ---------------------------------------------------------------------
-// Update charts with new data
+// Update charts and gauges
 // ---------------------------------------------------------------------
 function updateCharts(data) {
     const sorted = [...data].sort(
@@ -515,6 +633,9 @@ function updateCharts(data) {
         airQualityChart.update();
         setTimeout(() => airQualityChart.resetZoom(), 200);
     }
+
+    // Update gauges with the latest data
+    updateGauges(data);
 }
 
 // ---------------------------------------------------------------------
@@ -578,7 +699,7 @@ async function loadData() {
         defaultXMax = visibleMax;
         setAllChartsXRange(visibleMin, visibleMax);
 
-        // Update autorefresh timestamps
+        // Update autorefresh status
         lastUpdateTime = Date.now();
         nextRefreshTime = lastUpdateTime + 30000;
         updateStatus();
@@ -593,7 +714,7 @@ async function loadData() {
         setAllChartsXRange(defaultMin, now);
         setAllChartsXLimits(defaultMin, now);
         updateCharts([]);
-        // Reset status on error
+        // Reset status
         lastUpdateTime = null;
         nextRefreshTime = null;
         updateStatus();
@@ -614,14 +735,13 @@ clearFiltersBtn.addEventListener("click", () => {
     loadData();
 });
 
-refreshBtn.addEventListener("click", () => {
-    refresh();
-});
+refreshBtn.addEventListener("click", refresh);
 
 // ---------------------------------------------------------------------
 // Initialise
 // ---------------------------------------------------------------------
 setDefaultDateRange();
+createGaugeCards();
 initializeCharts();
 loadData();
 startAutoRefresh();
