@@ -36,6 +36,17 @@ const GAUGE_RANGES = {
     pm25: { min: 0, max: 500, unit: "ug/m3" },
 };
 
+// Map each metric to the chart canvas ID it should focus
+const METRIC_TO_CHART_ID = {
+    air_temp: "chart-air_temp",
+    ground_temp: "chart-ground_temp",
+    humidity: "chart-humidity",
+    nox: "chart-air_quality",
+    voc: "chart-air_quality",
+    pm10: "chart-air_quality",
+    pm25: "chart-air_quality",
+};
+
 let defaultXMin = null;
 let defaultXMax = null;
 let crosshairTimestamp = null;
@@ -43,6 +54,7 @@ let autoRefreshInterval = null;
 let lastUpdateTime = null;
 let countdownInterval = null;
 let nextRefreshTime = null;
+const previousGaugeValues = new Map(); // store last value to detect changes
 
 // ---------------------------------------------------------------------
 // Plugins
@@ -292,10 +304,15 @@ function createGaugeCards() {
         const card = document.createElement("div");
         card.className = "gauge-card";
         card.id = `gauge-${metric.key}`;
+        card.dataset.metric = metric.key;
         card.innerHTML = `
             <h3>${metric.label}</h3>
             <canvas id="gaugeCanvas-${metric.key}" width="160" height="160"></canvas>
         `;
+        // Click handler: focus the corresponding chart
+        card.addEventListener("click", () => {
+            focusChart(metric.key);
+        });
         grid.appendChild(card);
     });
 }
@@ -318,14 +335,13 @@ function drawGauge(canvasId, value, min, max, unit) {
     const clamped = Math.min(Math.max(value, min), max);
     const percent = (clamped - min) / (max - min);
 
-    // Full circle from 12 o'clock ( -PI/2 ) clockwise
     const startAngle = -Math.PI / 2;
     const endAngle = startAngle + 2 * Math.PI;
     const currentAngle = startAngle + 2 * Math.PI * percent;
 
     ctx.clearRect(0, 0, width, height);
 
-    // Background arc (full circle)
+    // Background arc
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, startAngle, endAngle);
     ctx.strokeStyle = "#e0e5ec";
@@ -333,7 +349,7 @@ function drawGauge(canvasId, value, min, max, unit) {
     ctx.lineCap = "round";
     ctx.stroke();
 
-    // Foreground arc (progress)
+    // Foreground arc
     if (percent > 0) {
         const gradient = ctx.createLinearGradient(0, 0, width, 0);
         gradient.addColorStop(0, "#2f6fed");
@@ -346,22 +362,22 @@ function drawGauge(canvasId, value, min, max, unit) {
         ctx.stroke();
     }
 
-    // Center label: numeric value
+    // Center label: numeric value with one decimal
     ctx.fillStyle = "#152238";
     ctx.font = "bold 28px Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(clamped.toFixed(1), centerX, centerY - 4);
 
-    // Unit below value (smaller)
     ctx.fillStyle = "#5b6b83";
     ctx.font = "14px Inter, sans-serif";
     ctx.fillText(unit, centerX, centerY + 24);
 }
 
+let lastDataTimestamp = null;
 function updateGauges(data) {
+    // If no data, clear gauges and reset the timestamp
     if (!data || !data.length) {
-        // Clear gauges
         METRICS.forEach((metric) => {
             const canvas = document.getElementById(`gaugeCanvas-${metric.key}`);
             if (canvas) {
@@ -369,30 +385,85 @@ function updateGauges(data) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         });
+        lastDataTimestamp = null; // reset so next load is considered "new"
         return;
     }
 
+    // Find the latest record (by submitted_at)
     const latest = data.reduce((a, b) =>
-        a.submitted_at > b.submitted_at ? a : b
+        a.submitted_at > b.submitted_at ? a : b,
     );
+
+    // Check if this is a new data point
+    const newData =
+        lastDataTimestamp === null || latest.submitted_at > lastDataTimestamp;
+    if (newData) {
+        lastDataTimestamp = latest.submitted_at;
+    }
 
     METRICS.forEach((metric) => {
         const value = latest[metric.key];
-        if (value === null || value === undefined) return;
         const range = GAUGE_RANGES[metric.key];
         if (!range) return;
+
+        // If the metric is null or undefined, clear the gauge and skip flashing
+        if (value === null || value === undefined) {
+            const canvas = document.getElementById(`gaugeCanvas-${metric.key}`);
+            if (canvas) {
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            return;
+        }
+
+        // Flash the gauge only if we have new data AND the value is not null
+        if (newData) {
+            const card = document.getElementById(`gauge-${metric.key}`);
+            if (card) {
+                card.classList.remove("gauge-flash");
+                void card.offsetWidth; // force reflow
+                card.classList.add("gauge-flash");
+                setTimeout(() => {
+                    card.classList.remove("gauge-flash");
+                }, 600);
+            }
+        }
+
+        // Draw the gauge with the current value (always redraw)
         drawGauge(
             `gaugeCanvas-${metric.key}`,
             value,
             range.min,
             range.max,
-            range.unit
+            range.unit,
         );
     });
 }
 
 // ---------------------------------------------------------------------
-// Refresh function (updates end time to now)
+// Focus chart on gauge click
+// ---------------------------------------------------------------------
+function focusChart(metricKey) {
+    const chartId = METRIC_TO_CHART_ID[metricKey];
+    if (!chartId) return;
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+    // Find the parent chart card (article.card.chart-card)
+    const card = canvas.closest(".chart-card");
+    if (!card) return;
+    // Scroll into view
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Add highlight animation
+    card.classList.remove("chart-highlight");
+    void card.offsetWidth; // reflow
+    card.classList.add("chart-highlight");
+    setTimeout(() => {
+        card.classList.remove("chart-highlight");
+    }, 1000);
+}
+
+// ---------------------------------------------------------------------
+// Refresh function
 // ---------------------------------------------------------------------
 function refresh() {
     const endSeconds = Math.floor(Date.now() / 1000);

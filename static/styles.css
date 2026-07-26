@@ -179,6 +179,15 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.gauge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(14, 31, 53, 0.12);
+}
+.gauge-card:active {
+  transform: scale(0.97);
 }
 
 .gauge-card h3 {
@@ -195,6 +204,24 @@ button {
   margin: 0 auto;
 }
 
+/* ---- Gauge flash animation ---- */
+.gauge-flash {
+  animation: gaugeFlash 0.6s ease;
+}
+@keyframes gaugeFlash {
+  0% { background-color: rgba(47, 111, 237, 0.25); }
+  100% { background-color: transparent; }
+}
+
+/* ---- Chart highlight (on click) ---- */
+.chart-highlight {
+  animation: chartHighlight 1s ease;
+}
+@keyframes chartHighlight {
+  0% { box-shadow: 0 0 0 4px var(--primary), var(--shadow); }
+  100% { box-shadow: var(--shadow); }
+}
+
 /* ---- Charts grid ---- */
 .charts-grid {
   display: grid;
@@ -204,13 +231,13 @@ button {
 
 .chart-card {
   width: 100%;
-  min-height: clamp(240px, 20vh, 380px);
+  min-height: clamp(240px, 38vh, 380px);
 }
 
 .chart-card canvas {
   cursor: grab;
   width: 100% !important;
-  height: clamp(170px, 12vh, 300px) !important;
+  height: clamp(170px, 30vh, 300px) !important;
 }
 .chart-card canvas:active {
   cursor: grabbing;
@@ -253,9 +280,9 @@ button {
     grid-template-columns: 1fr;
   }
   .chart-card {
-    min-height: clamp(220px, 20vh, 300px);
+    min-height: clamp(220px, 34vh, 300px);
   }
   .chart-card canvas {
-    height: clamp(150px, 12vh, 230px) !important;
+    height: clamp(150px, 26vh, 230px) !important;
   }
 }
