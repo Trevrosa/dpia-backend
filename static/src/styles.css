@@ -15,12 +15,21 @@
 
 body {
   margin: 0;
-  font-family: Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    Inter,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   color: var(--text);
   background: var(--bg);
 }
 
-input, button, select, textarea {
+input,
+button,
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -180,7 +189,9 @@ button {
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .gauge-card:hover {
   transform: translateY(-2px);
@@ -209,8 +220,12 @@ button {
   animation: gaugeFlash 0.6s ease;
 }
 @keyframes gaugeFlash {
-  0% { background-color: rgba(47, 111, 237, 0.25); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(47, 111, 237, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 /* ---- Chart highlight (on click) ---- */
@@ -218,8 +233,14 @@ button {
   animation: chartHighlight 1s ease;
 }
 @keyframes chartHighlight {
-  0% { box-shadow: 0 0 0 4px var(--primary), var(--shadow); }
-  100% { box-shadow: var(--shadow); }
+  0% {
+    box-shadow:
+      0 0 0 4px var(--primary),
+      var(--shadow);
+  }
+  100% {
+    box-shadow: var(--shadow);
+  }
 }
 
 /* ---- Charts grid ---- */
