@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DPIA Sensor Dashboard</title>
     <link rel="stylesheet" href="./styles.css" />
+
     <!-- Chart.js core -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <!-- Hammer.js (required for touch gestures) -->
@@ -16,14 +17,33 @@
   </head>
   <body>
     <main class="container">
+      <!-- Header with filters on the right -->
       <header class="page-header">
         <div>
           <p class="eyebrow">DPIA</p>
           <h1>Sensor Dashboard</h1>
         </div>
-        <button id="refreshBtn" class="primary-btn" type="button">Refresh</button>
+
+        <!-- Filter form and refresh button, now inline in the header -->
+        <div class="header-controls">
+          <form id="filterForm" class="filter-inline">
+            <label>
+              Start
+              <input id="startInput" name="start" type="datetime-local" step="1" />
+            </label>
+            <label>
+              End
+              <input id="endInput" name="end" type="datetime-local" step="1" />
+            </label>
+            <button class="primary-btn" type="submit">Apply</button>
+            <button id="clearFiltersBtn" class="secondary-btn" type="button">Clear</button>
+          </form>
+          <button id="refreshBtn" class="primary-btn" type="button">Refresh</button>
+          <span id="updateStatus" class="update-status">Last update: --</span>
+        </div>
       </header>
 
+      <!-- Charts grid (unchanged) -->
       <section class="charts-grid">
         <article class="card chart-card">
           <h2>Air Temperature (°C)</h2>
@@ -43,41 +63,7 @@
         </article>
       </section>
 
-      <section class="bottom-dock">
-        <section class="card controls controls-card">
-          <h2>Data Filters</h2>
-          <form id="filterForm" class="filter-grid">
-            <label>
-              Start date/time
-              <input id="startInput" name="start" type="datetime-local" step="1" />
-            </label>
-            <label>
-              End date/time
-              <input id="endInput" name="end" type="datetime-local" step="1" />
-            </label>
-            <div class="filter-actions">
-              <button class="primary-btn" type="submit">Apply</button>
-              <button id="clearFiltersBtn" class="secondary-btn" type="button">Clear</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="card current-card">
-          <h2>Current Reading</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Value</th>
-                  <th>Timestamp</th>
-                </tr>
-              </thead>
-              <tbody id="currentDataTable"></tbody>
-            </table>
-          </div>
-        </section>
-      </section>
+      <!-- Bottom dock removed entirely -->
     </main>
 
     <template id="messageRowTemplate">

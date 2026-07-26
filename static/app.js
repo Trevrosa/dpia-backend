@@ -25,8 +25,22 @@ const ONE_DAY_SECONDS = 24 * 60 * 60;
 const ZOOM_LIMIT_MS = 5 * 60 * 1000;
 const MAX_GAP_MS = 10 * 60 * 1000;
 
+// Default view range (for doubleclick reset)
+let defaultXMin = null;
+let defaultXMax = null;
+
+// Crosshair state
 let crosshairTimestamp = null;
 
+// Autorefresh state
+let autoRefreshInterval = null;
+let lastUpdateTime = null;
+let countdownInterval = null;
+let nextRefreshTime = null;
+
+// ---------------------------------------------------------------------
+// Plugins
+// ---------------------------------------------------------------------
 const crosshairPlugin = {
     id: "crosshair",
     afterDraw(chart, args, options) {
@@ -49,75 +63,26 @@ const crosshairPlugin = {
     },
 };
 
-// -------------------------------------------------------------
-// 1. Register plugins
-// -------------------------------------------------------------
 Chart.register(crosshairPlugin);
 Chart.register(ChartZoom);
 
 const charts = new Map();
-const currentDataTable = document.getElementById("currentDataTable");
 const filterForm = document.getElementById("filterForm");
 const refreshBtn = document.getElementById("refreshBtn");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 
-// -------------------------------------------------------------
-// 2. Helper functions (filters, timestamps, formatting)
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Helpers: filters, timestamps, formatting
+// ---------------------------------------------------------------------
 function getFilters() {
     const startInput = document.getElementById("startInput").value.trim();
     const endInput = document.getElementById("endInput").value.trim();
     const start = toUnixSeconds(startInput);
     const end = toUnixSeconds(endInput);
-
     return {
         ...(start ? { start } : {}),
         ...(end ? { end } : {}),
     };
-}
-
-function syncCrosshair(event, timestamp) {
-    crosshairTimestamp = timestamp;
-    charts.forEach((chart) => {
-        // Use Chart.js' builtin method to get elements under the mouse
-        const elements = chart.getElementsAtEventForMode(event, 'index', { intersect: false });
-        console.log(chart.canvas.id, elements)
-        if (elements && elements.length) {
-            chart.setActiveElements(elements);
-        } else {
-            chart.setActiveElements([]);
-        }
-        chart.tooltip.update();
-        chart.draw(); // redraw to show crosshair line
-    });
-}
-
-function clearCrosshair() {
-    crosshairTimestamp = null;
-    charts.forEach((chart) => {
-        chart.setActiveElements([]);
-        chart.tooltip.update();
-        chart.draw();
-    });
-}
-
-function clearCrosshair() {
-    crosshairTimestamp = null;
-    charts.forEach((chart) => {
-        chart.setActiveElements([]);
-        chart.tooltip.update();
-        chart.draw();
-    });
-}
-
-function getTimestampFromEvent(chart, event) {
-    const rect = chart.canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const xScale = chart.scales.x;
-    if (!xScale) return null;
-    const chartArea = chart.chartArea;
-    if (x < chartArea.left || x > chartArea.right) return null;
-    return xScale.getValueForPixel(x);
 }
 
 function toUnixSeconds(dateTimeValue) {
@@ -192,25 +157,52 @@ function formatTimeOnly(ts) {
     });
 }
 
-function formatValue(value, unit) {
-    if (value === null || value === undefined) return "N/A";
-    return `${value}${unit ? ` ${unit}` : ""}`;
+// ---------------------------------------------------------------------
+// Crosshair sync
+// ---------------------------------------------------------------------
+function getTimestampFromEvent(chart, event) {
+    const rect = chart.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const xScale = chart.scales.x;
+    if (!xScale) return null;
+    const chartArea = chart.chartArea;
+    if (x < chartArea.left || x > chartArea.right) return null;
+    return xScale.getValueForPixel(x);
 }
 
-function showTableMessage(message) {
-    currentDataTable.innerHTML = "";
-    const row = document
-        .getElementById("messageRowTemplate")
-        .content.cloneNode(true);
-    row.querySelector(".message-cell").textContent = message;
-    currentDataTable.appendChild(row);
+function syncCrosshair(event, timestamp) {
+    crosshairTimestamp = timestamp;
+    charts.forEach((chart) => {
+        const elements = chart.getElementsAtEventForMode(event, "index", {
+            intersect: false,
+        });
+        if (elements && elements.length) {
+            chart.setActiveElements(elements);
+        } else {
+            chart.setActiveElements([]);
+        }
+        chart.tooltip.update();
+        chart.draw();
+    });
 }
 
+function clearCrosshair() {
+    crosshairTimestamp = null;
+    charts.forEach((chart) => {
+        chart.setActiveElements([]);
+        chart.tooltip.update();
+        chart.draw();
+    });
+}
+
+// ---------------------------------------------------------------------
+// Chart range and limits
+// ---------------------------------------------------------------------
 function setAllChartsXRange(min, max) {
     charts.forEach((chart) => {
         chart.options.scales.x.min = min;
         chart.options.scales.x.max = max;
-        chart.update();
+        chart.update("none");
     });
 }
 
@@ -228,12 +220,74 @@ function resetChartView(chart) {
     chart.update();
 }
 
-// -------------------------------------------------------------
-// 3. Chart options – now using a TIME scale and the exact
-//    pan/zoom configuration from the fixed example.
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Autorefresh status display
+// ---------------------------------------------------------------------
+function updateStatus() {
+    const statusEl = document.getElementById("updateStatus");
+    if (!statusEl) return;
+
+    if (lastUpdateTime === null) {
+        statusEl.textContent = "Last update: --";
+        return;
+    }
+
+    const now = Date.now();
+    const diff = Math.floor((now - lastUpdateTime) / 1000);
+    if (diff < 60) {
+        statusEl.textContent = `Last update: ${diff}s ago`;
+    } else {
+        const mins = Math.floor(diff / 60);
+        const secs = diff % 60;
+        statusEl.textContent = `Last update: ${mins}m ${secs}s ago`;
+    }
+}
+
+function startCountdown() {
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+        const statusEl = document.getElementById("updateStatus");
+        if (!statusEl) return;
+        if (nextRefreshTime === null) return;
+
+        const now = Date.now();
+        const remaining = Math.max(
+            0,
+            Math.floor((nextRefreshTime - now) / 1000),
+        );
+        if (remaining === 0) {
+            statusEl.textContent = "Refreshing...";
+        } else {
+            statusEl.textContent = `Next refresh in ${remaining}s`;
+        }
+    }, 1000);
+}
+function refresh() {
+    const endSeconds = Math.floor(Date.now() / 1000);
+    document.getElementById("endInput").value = toDateTimeLocalValue(
+        endSeconds * 1000,
+    );
+    loadData();
+}
+function startAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(refresh, 30000);
+}
+
+function restartAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    startAutoRefresh();
+    if (lastUpdateTime) {
+        nextRefreshTime = Date.now() + 30000;
+        updateStatus();
+        startCountdown();
+    }
+}
+
+// ---------------------------------------------------------------------
+// Chart options
+// ---------------------------------------------------------------------
 function getChartOptions(showLegend, yRange, yUnit) {
-    const defaultRange = getPastDayRangeMs();
     return {
         normalized: true,
         responsive: true,
@@ -258,7 +312,6 @@ function getChartOptions(showLegend, yRange, yUnit) {
                     },
                 },
             },
-            // Pan & zoom – exactly as in the fixed example
             zoom: {
                 pan: {
                     enabled: true,
@@ -271,32 +324,23 @@ function getChartOptions(showLegend, yRange, yUnit) {
                         speed: 0.05,
                         modifierKey: null,
                     },
-                    pinch: {
-                        enabled: true,
-                    },
+                    pinch: { enabled: true },
                     mode: "x",
                 },
-                // Limits are set dynamically after data loads (see below)
                 limits: {
-                    x: {
-                        minRange: ZOOM_LIMIT_MS, // prevent zooming below this scale
-                    },
+                    x: { minRange: ZOOM_LIMIT_MS },
                 },
             },
         },
         scales: {
             x: {
                 type: "time",
-                // initial min/max set later
                 time: {
-                    // unit: "",
                     displayFormats: {
                         minute: "HH:mm",
                     },
                 },
-                grid: {
-                    color: "rgba(0,0,0,0.05)",
-                },
+                grid: { color: "rgba(0,0,0,0.05)" },
             },
             y: {
                 min: yRange?.min,
@@ -308,9 +352,9 @@ function getChartOptions(showLegend, yRange, yUnit) {
     };
 }
 
-// -------------------------------------------------------------
-// 4. Chart creation functions (unchanged except options)
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Chart creation
+// ---------------------------------------------------------------------
 function createSingleMetricChart(metric) {
     const ctx = document.getElementById(`chart-${metric.key}`);
     if (!ctx) return;
@@ -338,6 +382,7 @@ function createSingleMetricChart(metric) {
             metric.unit,
         ),
     });
+
     chart.canvas.addEventListener("mousemove", (e) => {
         const timestamp = getTimestampFromEvent(chart, e);
         if (timestamp !== null && timestamp !== undefined) {
@@ -383,6 +428,7 @@ function createAirQualityChart() {
         data: { datasets },
         options: options,
     });
+
     chart.canvas.addEventListener("mousemove", (e) => {
         const timestamp = getTimestampFromEvent(chart, e);
         if (timestamp !== null && timestamp !== undefined) {
@@ -405,9 +451,9 @@ function initializeCharts() {
     createAirQualityChart();
 }
 
-// -------------------------------------------------------------
-// 5. Updating charts with data (unchanged)
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Data gapbreaking
+// ---------------------------------------------------------------------
 function breakGaps(points, maxGapMs) {
     if (points.length < 2) return points.slice();
     const result = [];
@@ -415,26 +461,27 @@ function breakGaps(points, maxGapMs) {
         result.push(points[i]);
         const gap = points[i + 1].x - points[i].x;
         if (gap > maxGapMs) {
-            // Insert a null point to break the line immediately after points[i]
             result.push({ x: points[i].x, y: null });
         }
     }
     result.push(points[points.length - 1]);
     return result;
 }
+
+// ---------------------------------------------------------------------
+// Update charts with new data
+// ---------------------------------------------------------------------
 function updateCharts(data) {
     const sorted = [...data].sort(
         (a, b) => (a.submitted_at ?? 0) - (b.submitted_at ?? 0),
     );
 
-    // Update individual charts
     INDIVIDUAL_CHART_METRICS.forEach((key) => {
         const metric = METRICS.find((item) => item.key === key);
         if (!metric) return;
         const chart = charts.get(metric.key);
         if (!chart) return;
 
-        // Build raw points (filter out null/undefined values)
         let points = sorted
             .filter(
                 (item) =>
@@ -446,17 +493,12 @@ function updateCharts(data) {
             })
             .filter(Boolean);
 
-        // Break gaps if they exceed the threshold
         points = breakGaps(points, MAX_GAP_MS);
-
         chart.data.datasets[0].data = points;
         chart.update();
-        setTimeout(() => {
-            chart.resetZoom();
-        }, 200);
+        setTimeout(() => chart.resetZoom(), 200);
     });
 
-    // Update air quality chart (multi-dataset)
     const airQualityChart = charts.get("air_quality");
     if (airQualityChart) {
         AIR_QUALITY_METRICS.forEach((key, index) => {
@@ -467,71 +509,20 @@ function updateCharts(data) {
                     return x ? { x, y: item[key] } : null;
                 })
                 .filter(Boolean);
-
             points = breakGaps(points, MAX_GAP_MS);
-
             airQualityChart.data.datasets[index].data = points;
         });
         airQualityChart.update();
-        airQualityChart.resetZoom();
-        setTimeout(() => {
-            airQualityChart.resetZoom();
-        }, 200);
+        setTimeout(() => airQualityChart.resetZoom(), 200);
     }
 }
 
-// -------------------------------------------------------------
-// 6. Setting the visible x axis range and limits
-//    (simplified: no custom "visible points" logic)
-// -------------------------------------------------------------
-function setAllChartsXRange(min, max) {
-    charts.forEach((chart) => {
-        chart.options.scales.x.min = min;
-        chart.options.scales.x.max = max;
-        chart.update("none");
-    });
-}
-
-function setAllChartsXLimits(min, max) {
-    charts.forEach((chart) => {
-        chart.options.plugins.zoom.limits.x.min = min;
-        chart.options.plugins.zoom.limits.x.max = max;
-    });
-}
-
-// -------------------------------------------------------------
-// 7. Current data table (unchanged)
-// -------------------------------------------------------------
-function updateCurrentTable(data) {
-    if (!data.length) {
-        showTableMessage("No sensor data available for this filter.");
-        return;
-    }
-
-    const latest = [...data].sort(
-        (a, b) => (b.submitted_at ?? 0) - (a.submitted_at ?? 0),
-    )[0];
-    currentDataTable.innerHTML = "";
-
-    METRICS.forEach((metric) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-      <td>${metric.label}</td>
-      <td>${formatValue(latest[metric.key], metric.unit)}</td>
-      <td>${formatTimestamp(latest.submitted_at)}</td>
-    `;
-        currentDataTable.appendChild(row);
-    });
-}
-
-// -------------------------------------------------------------
-// 8. Main data loading – now sets range & limits from the data
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Main data loading
+// ---------------------------------------------------------------------
 async function loadData() {
     const filters = getFilters();
     const url = buildUrl(filters);
-
-    showTableMessage("Loading data...");
 
     try {
         const response = await fetch(url, { method: "GET" });
@@ -546,7 +537,6 @@ async function loadData() {
 
         updateCharts(data);
 
-        // 1. Determine global data min
         const timestamps = data
             .map((item) => normalizeTimestamp(item.submitted_at))
             .filter((ts) => Number.isFinite(ts));
@@ -556,58 +546,46 @@ async function loadData() {
             ? Math.min(...timestamps)
             : now - ONE_DAY_SECONDS * 1000;
 
-        // 2. Global max = filter's end time, or current time
         const endSeconds = filters.end ? Number(filters.end) : null;
         const startSeconds = filters.start ? Number(filters.start) : null;
 
-        let globalMax;
-        if (endSeconds !== null && Number.isFinite(endSeconds)) {
-            globalMax = endSeconds * 1000;
-        } else {
-            globalMax = now; // ← always ends at current time
-        }
-        if (globalMax < globalMin) globalMax = globalMin + ONE_MINUTE_MS;
+        let globalMax =
+            endSeconds !== null && Number.isFinite(endSeconds)
+                ? endSeconds * 1000
+                : now;
+        if (globalMax < globalMin) globalMax = globalMin + ZOOM_LIMIT_MS;
 
-        // 3. Set pan/zoom limits to the full allowed range
         setAllChartsXLimits(globalMin, globalMax);
 
-        // 4. Compute the default visible range
-        let visibleMin, visibleMax;
+        let visibleMin =
+            startSeconds !== null && Number.isFinite(startSeconds)
+                ? startSeconds * 1000
+                : Math.max(globalMin, now - 60 * 60 * 1000);
 
-        if (startSeconds !== null && Number.isFinite(startSeconds)) {
-            visibleMin = startSeconds * 1000;
-        } else {
-            // No start filter → show the last 1 hour (or data start if later)
-            const oneHourAgo = now - 60 * 60 * 1000;
-            visibleMin = Math.max(globalMin, oneHourAgo);
-        }
+        let visibleMax =
+            endSeconds !== null && Number.isFinite(endSeconds)
+                ? endSeconds * 1000
+                : now;
 
-        if (endSeconds !== null && Number.isFinite(endSeconds)) {
-            visibleMax = endSeconds * 1000;
-        } else {
-            visibleMax = now; // ← always ends at current time
-        }
-
-        // Safety: ensure visibleMin < visibleMax
         if (visibleMin >= visibleMax) {
             visibleMin = globalMin;
             visibleMax = globalMax;
         }
-
-        // Clamp to limits
         visibleMin = Math.max(visibleMin, globalMin);
         visibleMax = Math.min(visibleMax, globalMax);
 
-        // 5. Store this as the default (for double-click reset)
         defaultXMin = visibleMin;
         defaultXMax = visibleMax;
-
         setAllChartsXRange(visibleMin, visibleMax);
 
-        updateCurrentTable(data);
+        // Update autorefresh timestamps
+        lastUpdateTime = Date.now();
+        nextRefreshTime = lastUpdateTime + 30000;
+        updateStatus();
+        startCountdown();
+        restartAutoRefresh();
     } catch (error) {
-        showTableMessage(`Failed to load data: ${error.message}`);
-        // On error, reset to a safe default range
+        console.error("Failed to load data:", error);
         const now = Date.now();
         const defaultMin = now - ONE_DAY_SECONDS * 1000;
         defaultXMin = defaultMin;
@@ -615,12 +593,17 @@ async function loadData() {
         setAllChartsXRange(defaultMin, now);
         setAllChartsXLimits(defaultMin, now);
         updateCharts([]);
+        // Reset status on error
+        lastUpdateTime = null;
+        nextRefreshTime = null;
+        updateStatus();
+        if (countdownInterval) clearInterval(countdownInterval);
     }
 }
 
-// -------------------------------------------------------------
-// 9. Event listeners (unchanged)
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Event listeners
+// ---------------------------------------------------------------------
 filterForm.addEventListener("submit", (event) => {
     event.preventDefault();
     loadData();
@@ -632,16 +615,13 @@ clearFiltersBtn.addEventListener("click", () => {
 });
 
 refreshBtn.addEventListener("click", () => {
-    const endSeconds = Math.floor(Date.now() / 1000);
-    document.getElementById("endInput").value = toDateTimeLocalValue(
-        endSeconds * 1000,
-    );
-    loadData();
+    refresh();
 });
 
-// -------------------------------------------------------------
-// 10. Initialise
-// -------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Initialise
+// ---------------------------------------------------------------------
 setDefaultDateRange();
 initializeCharts();
 loadData();
+startAutoRefresh();
