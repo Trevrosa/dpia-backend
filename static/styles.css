@@ -204,13 +204,13 @@ button {
 
 .chart-card {
   width: 100%;
-  min-height: clamp(240px, 38vh, 380px);
+  min-height: clamp(240px, 20vh, 380px);
 }
 
 .chart-card canvas {
   cursor: grab;
   width: 100% !important;
-  height: clamp(170px, 30vh, 300px) !important;
+  height: clamp(170px, 12vh, 300px) !important;
 }
 .chart-card canvas:active {
   cursor: grabbing;
@@ -253,9 +253,9 @@ button {
     grid-template-columns: 1fr;
   }
   .chart-card {
-    min-height: clamp(220px, 34vh, 300px);
+    min-height: clamp(220px, 20vh, 300px);
   }
   .chart-card canvas {
-    height: clamp(150px, 26vh, 230px) !important;
+    height: clamp(150px, 12vh, 230px) !important;
   }
 }
