@@ -9,6 +9,12 @@
     --shadow: 0 8px 24px rgba(14, 31, 53, 0.08);
 }
 
+.data-timestamp {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+}
+
 * {
     box-sizing: border-box;
 }

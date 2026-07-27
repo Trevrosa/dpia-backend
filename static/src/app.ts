@@ -253,6 +253,30 @@ function formatTimestamp(ts: number): string {
   return new Date(normalized).toLocaleString();
 }
 
+function getRelativeTime(ms: number): string {
+  const now = Date.now();
+  const diff = Math.floor((now - ms) / 1000); // seconds
+  if (diff < 60) return `${diff} second${diff !== 1 ? "s" : ""}`;
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""}`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""}`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days !== 1 ? "s" : ""}`;
+}
+
+function updateDataTimestamp(timestamp: number | null): void {
+  const el = document.getElementById("dataTimestamp");
+  if (!el) return;
+  if (timestamp === null) {
+    el.textContent = "No data available";
+    return;
+  }
+  const formatted = formatTimestamp(timestamp);
+  const relative = getRelativeTime(normalizeTimestamp(timestamp)!);
+  el.textContent = `Data up to date as of ${formatted} (${relative} ago)`;
+}
+
 // ---------------------------------------------------------------------
 // Crosshair sync
 // ---------------------------------------------------------------------
@@ -360,6 +384,10 @@ function startCountdown(): void {
       statusEl.textContent = "Refreshing...";
     } else {
       statusEl.textContent = `Next refresh in ${remaining}s`;
+    }
+    // Update the relative time for data timestamp every second
+    if (lastDataTimestamp !== null) {
+      updateDataTimestamp(lastDataTimestamp);
     }
   }, 1000);
 }
@@ -478,6 +506,7 @@ function updateGauges(data: SensorRecord[]): void {
       }
     });
     lastDataTimestamp = null;
+    updateDataTimestamp(null);
     return;
   }
 
@@ -488,6 +517,7 @@ function updateGauges(data: SensorRecord[]): void {
     lastDataTimestamp === null || latest.submitted_at > lastDataTimestamp;
   if (newData) {
     lastDataTimestamp = latest.submitted_at;
+    updateDataTimestamp(lastDataTimestamp);
   }
 
   METRICS.forEach((metric) => {
