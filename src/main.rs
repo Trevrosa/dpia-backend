@@ -1,13 +1,15 @@
 use std::{
     env,
     net::{Ipv4Addr, SocketAddrV4},
+    sync::LazyLock,
     time::Duration,
 };
 
 use axum::{
     Json, Router,
-    extract::{Query, State},
-    http::StatusCode,
+    body::Body,
+    extract::{Query, Request, State},
+    http::{Response, StatusCode},
     routing::{get, post},
 };
 use axum_client_ip::{ClientIp, ClientIpSource};
@@ -17,7 +19,10 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, prelude::FromRow};
 use tokio::{net::TcpListener, signal};
-use tower_http::{compression::CompressionLayer, services::ServeDir, timeout::TimeoutLayer};
+use tower_http::{
+    auth::AsyncRequireAuthorizationLayer, compression::CompressionLayer, services::ServeDir,
+    timeout::TimeoutLayer,
+};
 use tracing::{info, instrument, level_filters::LevelFilter, warn};
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -26,6 +31,8 @@ struct AppState {
     pool: Pool<Sqlite>,
     client: Client,
 }
+
+static TOKEN: LazyLock<String> = LazyLock::new(|| env::var("TOKEN").expect("this must be set"));
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -56,9 +63,26 @@ async fn main() -> anyhow::Result<()> {
         client: Client::new(),
     };
 
+    let auth_layer = AsyncRequireAuthorizationLayer::new(|req: Request| async move {
+        let unauth = Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap();
+
+        let Some(their_token) = req.headers().get("token") else {
+            return Err(unauth);
+        };
+
+        if their_token == &*TOKEN {
+            Ok(req)
+        } else {
+            Err(unauth)
+        }
+    });
+
     let app = Router::new()
         .fallback_service(ServeDir::new("./static").precompressed_br())
-        .route("/data", post(submit_data))
+        .route("/data", post(submit_data).layer(auth_layer))
         .route(
             "/data",
             get(get_data).layer(CompressionLayer::new().zstd(true)),
