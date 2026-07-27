@@ -1,315 +1,309 @@
 :root {
-    --bg: #f3f5f8;
-    --card: #ffffff;
-    --border: #dde3ea;
-    --text: #152238;
-    --muted: #5b6b83;
-    --primary: #2f6fed;
-    --primary-hover: #245ad0;
-    --shadow: 0 8px 24px rgba(14, 31, 53, 0.08);
-}
-
-.data-timestamp {
-    font-size: 0.85rem;
-    color: var(--muted);
-    margin-bottom: 0.75rem;
+  --bg: #f3f5f8;
+  --card: #ffffff;
+  --border: #dde3ea;
+  --text: #152238;
+  --muted: #5b6b83;
+  --primary: #2f6fed;
+  --primary-hover: #245ad0;
+  --shadow: 0 8px 24px rgba(14, 31, 53, 0.08);
 }
 
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    font-family:
-        Inter,
-        Segoe UI,
-        Roboto,
-        Helvetica,
-        Arial,
-        sans-serif;
-    color: var(--text);
-    background: var(--bg);
+  margin: 0;
+  font-family:
+    Inter,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
 }
 
 input,
 button,
 select,
 textarea {
-    font-family: inherit;
+  font-family: inherit;
 }
 
 .container {
-    width: 100%;
-    margin: 1.25rem 0 2rem;
-    padding: 0 clamp(0.75rem, 2vw, 1.75rem);
-    display: grid;
-    gap: 1rem;
-    padding-bottom: 2rem;
+  width: 100%;
+  margin: 1.25rem 0 2rem;
+  padding: 0 clamp(0.75rem, 2vw, 1.75rem);
+  display: grid;
+  gap: 1rem;
+  padding-bottom: 2rem;
 }
 
-/* ---- Header with filters ---- */
+/* ---- Header ---- */
 .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .page-header > div {
-    flex: 0 1 auto;
-}
-
-.eyebrow {
-    margin: 0;
-    font-size: 0.8rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
+  flex: 0 1 auto;
 }
 
 h1 {
-    margin: 0.25rem 0 0;
-    font-size: 1.8rem;
+  margin: 0.25rem 0 0;
+  font-size: 1.8rem;
 }
 
 .header-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.filter-inline {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.filter-inline label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.85rem;
-    color: var(--muted);
-    white-space: nowrap;
-}
-
-.filter-inline input {
-    width: auto;
-    min-width: 140px;
-    height: 2.2rem;
-    padding: 0 0.5rem;
-    font-size: 0.9rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: #fff;
-    color: var(--text);
-}
-
-.filter-inline input:focus {
-    outline: 2px solid #bdd4ff;
-    border-color: var(--primary);
-}
-
-.filter-inline button {
-    height: 2.2rem;
-    padding: 0 0.8rem;
-    font-size: 0.85rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .update-status {
-    font-size: 0.85rem;
-    color: var(--muted);
-    white-space: nowrap;
-    padding: 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  padding: 0 0.5rem;
 }
 
 /* ---- Cards ---- */
 h2 {
-    margin-top: 0;
-    font-size: 1.1rem;
+  margin-top: 0;
+  font-size: 1.1rem;
 }
 
 .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
-    padding: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 1rem;
 }
 
 /* ---- Buttons ---- */
 button {
-    border: none;
-    border-radius: 8px;
-    height: 2.5rem;
-    padding: 0 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 0.9rem;
+  border: none;
+  border-radius: 8px;
+  height: 2.5rem;
+  padding: 0 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .primary-btn {
-    background: var(--primary);
-    color: #fff;
+  background: var(--primary);
+  color: #fff;
 }
 .primary-btn:hover {
-    background: var(--primary-hover);
+  background: var(--primary-hover);
 }
 
 .secondary-btn {
-    background: #ebeff5;
-    color: #213146;
+  background: #ebeff5;
+  color: #213146;
 }
 
 /* ---- Dashboard gauges ---- */
 .metrics-dashboard {
-    margin-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 .metrics-dashboard h2 {
-    font-size: 1.2rem;
-    margin-bottom: 0.75rem;
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.data-timestamp {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
 }
 
 .gauge-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
 }
 
 .gauge-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
-    padding: 0.8rem 0.5rem;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    transition:
-        transform 0.15s ease,
-        box-shadow 0.15s ease;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 0.8rem 0.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .gauge-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgba(14, 31, 53, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(14, 31, 53, 0.12);
 }
 .gauge-card:active {
-    transform: scale(0.97);
+  transform: scale(0.97);
 }
 
 .gauge-card h3 {
-    font-size: 0.85rem;
-    margin: 0 0 0.3rem 0;
-    color: var(--muted);
-    font-weight: 500;
+  font-size: 0.85rem;
+  margin: 0 0 0.3rem 0;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .gauge-card canvas {
-    width: 100px;
-    height: 100px;
-    display: block;
-    margin: 0 auto;
+  width: 100px;
+  height: 100px;
+  display: block;
+  margin: 0 auto;
 }
 
 /* ---- Gauge flash animation ---- */
 .gauge-flash {
-    animation: gaugeFlash 0.6s ease;
+  animation: gaugeFlash 0.6s ease;
 }
 @keyframes gaugeFlash {
-    0% {
-        background-color: rgba(47, 111, 237, 0.25);
-    }
-    100% {
-        background-color: transparent;
-    }
+  0% {
+    background-color: rgba(47, 111, 237, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 /* ---- Chart highlight (on click) ---- */
 .chart-highlight {
-    animation: chartHighlight 1s ease;
+  animation: chartHighlight 1s ease;
 }
 @keyframes chartHighlight {
-    0% {
-        box-shadow:
-            0 0 0 4px var(--primary),
-            var(--shadow);
-    }
-    100% {
-        box-shadow: var(--shadow);
-    }
+  0% {
+    box-shadow:
+      0 0 0 4px var(--primary),
+      var(--shadow);
+  }
+  100% {
+    box-shadow: var(--shadow);
+  }
+}
+
+/* ---- Chart header with time controls ---- */
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.chart-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.chart-time-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.chart-time-controls .shift-btn,
+.chart-time-controls .calendar-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.4rem;
+  height: 1.8rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+.chart-time-controls .shift-btn:hover,
+.chart-time-controls .calendar-btn:hover {
+  background: var(--bg);
+}
+
+.chart-time-controls .time-display {
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-width: 200px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Charts grid ---- */
 .charts-grid {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: 1fr;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
 }
 
 .chart-card {
-    width: 100%;
-    min-height: clamp(240px, 38vh, 380px);
+  width: 100%;
+  min-height: clamp(240px, 38vh, 380px);
 }
 
 .chart-card canvas {
-    cursor: grab;
-    width: 100% !important;
-    height: clamp(170px, 30vh, 300px) !important;
+  cursor: grab;
+  width: 100% !important;
+  height: clamp(170px, 30vh, 300px) !important;
 }
 .chart-card canvas:active {
-    cursor: grabbing;
+  cursor: grabbing;
 }
 
 /* ---- Responsive ---- */
 @media (max-width: 700px) {
-    .container {
-        padding: 0 0.75rem;
-        padding-bottom: 2rem;
-    }
-    .page-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .header-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .filter-inline {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .filter-inline label {
-        white-space: normal;
-        flex-wrap: wrap;
-    }
-    .filter-inline input {
-        width: 100%;
-        min-width: unset;
-    }
-    .gauge-grid {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    }
-    .gauge-card canvas {
-        width: 80px;
-        height: 80px;
-    }
-    .charts-grid {
-        grid-template-columns: 1fr;
-    }
-    .chart-card {
-        min-height: clamp(220px, 34vh, 300px);
-    }
-    .chart-card canvas {
-        height: clamp(150px, 26vh, 230px) !important;
-    }
+  .container {
+    padding: 0 0.75rem;
+    padding-bottom: 2rem;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .gauge-grid {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+  .gauge-card canvas {
+    width: 80px;
+    height: 80px;
+  }
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .chart-time-controls {
+    align-self: stretch;
+    justify-content: flex-start;
+  }
+  .chart-time-controls .time-display {
+    min-width: 140px;
+    font-size: 0.7rem;
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .chart-card {
+    min-height: clamp(220px, 34vh, 300px);
+  }
+  .chart-card canvas {
+    height: clamp(150px, 26vh, 230px) !important;
+  }
 }

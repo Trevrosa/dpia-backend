@@ -1,67 +1,94 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>DPIA Sensor Dashboard</title>
-        <link rel="stylesheet" href="./styles.css" />
-    </head>
-    <body>
-        <main class="container">
-            <!-- Header with filters -->
-            <header class="page-header">
-                <div>
-                    <!--<p class="eyebrow">DPIA</p>-->
-                    <h1>Sensor Dashboard</h1>
-                </div>
-                <div class="header-controls">
-                    <form id="filterForm" class="filter-inline">
-                        <label>
-                            Start
-                            <input id="startInput" name="start" type="datetime-local" step="1" />
-                        </label>
-                        <label>
-                            End
-                            <input id="endInput" name="end" type="datetime-local" step="1" />
-                        </label>
-                        <button class="primary-btn" type="submit">Apply</button>
-                        <button id="clearFiltersBtn" class="secondary-btn" type="button">
-                            Clear
-                        </button>
-                    </form>
-                    <button id="refreshBtn" class="primary-btn" type="button">Refresh</button>
-                    <span id="updateStatus" class="update-status">Last update: --</span>
-                </div>
-            </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DPIA Sensor Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <!-- Header with refresh and status -->
+      <header class="page-header">
+        <div>
+          <h1>Sensor Dashboard</h1>
+        </div>
+        <div class="header-controls">
+          <button id="refreshBtn" class="primary-btn" type="button">Refresh</button>
+          <span id="updateStatus" class="update-status">Last update: --</span>
+        </div>
+      </header>
 
-            <!-- Dashboard gauges -->
-            <section class="metrics-dashboard">
-                <h2>Live Readings</h2>
-                <div id="dataTimestamp" class="data-timestamp"></div>
-                <div class="gauge-grid" id="gaugeGrid"></div>
-            </section>
+      <!-- Dashboard gauges -->
+      <section class="metrics-dashboard">
+        <h2>Live Readings</h2>
+        <div id="dataTimestamp" class="data-timestamp"></div>
+        <div class="gauge-grid" id="gaugeGrid"></div>
+      </section>
 
-            <!-- Charts grid -->
-            <section class="charts-grid">
-                <article class="card chart-card">
-                    <h2>Air Temperature (°C)</h2>
-                    <canvas id="chart-air_temp"></canvas>
-                </article>
-                <article class="card chart-card">
-                    <h2>Ground Temperature (°C)</h2>
-                    <canvas id="chart-ground_temp"></canvas>
-                </article>
-                <article class="card chart-card">
-                    <h2>Humidity (%)</h2>
-                    <canvas id="chart-humidity"></canvas>
-                </article>
-                <article class="card chart-card">
-                    <h2>Air Quality</h2>
-                    <canvas id="chart-air_quality"></canvas>
-                </article>
-            </section>
-        </main>
+      <!-- Hidden input for flatpickr range picker -->
+      <input type="text" id="rangePicker" style="display: none" />
 
-        <script type="module" src="./app.ts"></script>
-    </body>
+      <!-- Charts grid with per‑chart time controls -->
+      <section class="charts-grid">
+        <!-- Air Temperature -->
+        <article class="card chart-card">
+          <div class="chart-header">
+            <h2>Air Temperature (°C)</h2>
+            <div class="chart-time-controls">
+              <button class="shift-btn" data-days="-1" title="Shift start 1 day earlier">◄</button>
+              <span class="time-display">--</span>
+              <button class="shift-btn" data-days="1" title="Shift start 1 day later">►</button>
+              <button class="calendar-btn" title="Pick range">📅</button>
+            </div>
+          </div>
+          <canvas id="chart-air_temp"></canvas>
+        </article>
+
+        <!-- Ground Temperature -->
+        <article class="card chart-card">
+          <div class="chart-header">
+            <h2>Ground Temperature (°C)</h2>
+            <div class="chart-time-controls">
+              <button class="shift-btn" data-days="-1" title="Shift start 1 day earlier">◄</button>
+              <span class="time-display">--</span>
+              <button class="shift-btn" data-days="1" title="Shift start 1 day later">►</button>
+              <button class="calendar-btn" title="Pick range">📅</button>
+            </div>
+          </div>
+          <canvas id="chart-ground_temp"></canvas>
+        </article>
+
+        <!-- Humidity -->
+        <article class="card chart-card">
+          <div class="chart-header">
+            <h2>Humidity (%)</h2>
+            <div class="chart-time-controls">
+              <button class="shift-btn" data-days="-1" title="Shift start 1 day earlier">◄</button>
+              <span class="time-display">--</span>
+              <button class="shift-btn" data-days="1" title="Shift start 1 day later">►</button>
+              <button class="calendar-btn" title="Pick range">📅</button>
+            </div>
+          </div>
+          <canvas id="chart-humidity"></canvas>
+        </article>
+
+        <!-- Air Quality -->
+        <article class="card chart-card">
+          <div class="chart-header">
+            <h2>Air Quality</h2>
+            <div class="chart-time-controls">
+              <button class="shift-btn" data-days="-1" title="Shift start 1 day earlier">◄</button>
+              <span class="time-display">--</span>
+              <button class="shift-btn" data-days="1" title="Shift start 1 day later">►</button>
+              <button class="calendar-btn" title="Pick range">📅</button>
+            </div>
+          </div>
+          <canvas id="chart-air_quality"></canvas>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./app.ts"></script>
+  </body>
 </html>

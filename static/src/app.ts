@@ -14,8 +14,12 @@ import {
 
 import zoomPlugin from "chartjs-plugin-zoom";
 import "chartjs-adapter-date-fns";
+import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.css";
 
-// Register plugins globally
+// ---------------------------------------------------------------------
+// Register Chart.js components
+// ---------------------------------------------------------------------
 Chart.register(
   LineController,
   LineElement,
@@ -138,17 +142,18 @@ let countdownInterval: number | null = null;
 let nextRefreshTime: number | null = null;
 let lastDataTimestamp: number | null = null;
 
+let startTimeMs: number = Date.now() - ONE_DAY_SECONDS * 1000;
+let endTimeMs: number = Date.now();
+
 const charts = new Map<string, Chart>();
 
 // ---------------------------------------------------------------------
 // DOM references
 // ---------------------------------------------------------------------
 
-const filterForm = document.getElementById("filterForm") as HTMLFormElement;
 const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
-const clearFiltersBtn = document.getElementById(
-  "clearFiltersBtn",
-) as HTMLButtonElement;
+const chartsGrid = document.querySelector(".charts-grid") as HTMLElement;
+const rangePicker = document.getElementById("rangePicker") as HTMLInputElement;
 
 // ---------------------------------------------------------------------
 // Plugins
@@ -183,45 +188,11 @@ Chart.register(crosshairPlugin);
 // ---------------------------------------------------------------------
 
 function getFilters(): FilterParams {
-  const startInput = (
-    document.getElementById("startInput") as HTMLInputElement
-  ).value.trim();
-  const endInput = (
-    document.getElementById("endInput") as HTMLInputElement
-  ).value.trim();
-  const start = toUnixSeconds(startInput);
-  const end = toUnixSeconds(endInput);
+  if (startTimeMs > endTimeMs) startTimeMs = endTimeMs;
   return {
-    ...(start ? { start } : {}),
-    ...(end ? { end } : {}),
+    start: String(Math.floor(startTimeMs / 1000)),
+    end: String(Math.floor(endTimeMs / 1000)),
   };
-}
-
-function toUnixSeconds(dateTimeValue: string): string | null {
-  if (!dateTimeValue) return null;
-  const milliseconds = new Date(dateTimeValue).getTime();
-  if (Number.isNaN(milliseconds)) return null;
-  return String(Math.floor(milliseconds / 1000));
-}
-
-function toDateTimeLocalValue(milliseconds: number): string {
-  const date = new Date(milliseconds);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
-  const second = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-}
-
-function setDefaultDateRange(): void {
-  const endSeconds = Math.floor(Date.now() / 1000);
-  const startSeconds = endSeconds - ONE_DAY_SECONDS;
-  (document.getElementById("startInput") as HTMLInputElement).value =
-    toDateTimeLocalValue(startSeconds * 1000);
-  (document.getElementById("endInput") as HTMLInputElement).value =
-    toDateTimeLocalValue(endSeconds * 1000);
 }
 
 function buildUrl(filters: FilterParams): URL {
@@ -251,30 +222,6 @@ function formatTimestamp(ts: number): string {
   const normalized = normalizeTimestamp(ts);
   if (!normalized) return "N/A";
   return new Date(normalized).toLocaleString();
-}
-
-function getRelativeTime(ms: number): string {
-  const now = Date.now();
-  const diff = Math.floor((now - ms) / 1000); // seconds
-  if (diff < 60) return `${diff} second${diff !== 1 ? "s" : ""}`;
-  const mins = Math.floor(diff / 60);
-  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""}`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""}`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days !== 1 ? "s" : ""}`;
-}
-
-function updateDataTimestamp(timestamp: number | null): void {
-  const el = document.getElementById("dataTimestamp");
-  if (!el) return;
-  if (timestamp === null) {
-    el.textContent = "No data available";
-    return;
-  }
-  const formatted = formatTimestamp(timestamp);
-  const relative = getRelativeTime(normalizeTimestamp(timestamp)!);
-  el.textContent = `Data up to date as of ${formatted} (${relative} ago)`;
 }
 
 // ---------------------------------------------------------------------
@@ -372,8 +319,40 @@ function updateStatus(): void {
   }
 }
 
+function getRelativeTime(ms: number): string {
+  const now = Date.now();
+  const diff = Math.floor((now - ms) / 1000);
+  if (diff < 60) return `${diff} second${diff !== 1 ? "s" : ""}`;
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""}`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""}`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days !== 1 ? "s" : ""}`;
+}
+
+function updateDataTimestamp(timestamp: number | null): void {
+  const el = document.getElementById("dataTimestamp");
+  if (!el) return;
+  if (timestamp === null) {
+    el.textContent = "No data available";
+    return;
+  }
+  const normalized = normalizeTimestamp(timestamp);
+  if (!normalized) {
+    el.textContent = "Invalid timestamp";
+    return;
+  }
+  const formatted = formatTimestamp(normalized);
+  const relative = getRelativeTime(normalized);
+  el.textContent = `Data up to date as of ${formatted} (${relative} ago)`;
+}
+
 function startCountdown(): void {
   if (countdownInterval) clearInterval(countdownInterval);
+  if (lastDataTimestamp !== null) {
+    updateDataTimestamp(lastDataTimestamp);
+  }
   countdownInterval = window.setInterval(() => {
     const statusEl = document.getElementById("updateStatus");
     if (!statusEl) return;
@@ -385,7 +364,6 @@ function startCountdown(): void {
     } else {
       statusEl.textContent = `Next refresh in ${remaining}s`;
     }
-    // Update the relative time for data timestamp every second
     if (lastDataTimestamp !== null) {
       updateDataTimestamp(lastDataTimestamp);
     }
@@ -408,6 +386,26 @@ function restartAutoRefresh(): void {
 }
 
 // ---------------------------------------------------------------------
+// Time controls
+// ---------------------------------------------------------------------
+
+function updateRangeDisplay(): void {
+  const displays = document.querySelectorAll(".time-display");
+  const startFormatted = formatTimestamp(startTimeMs);
+  displays.forEach((el) => (el.textContent = startFormatted));
+}
+
+function shiftStart(days: number): void {
+  const maxStart = endTimeMs - 1 * 24 * 60 * 60 * 1000;
+  let newStart = startTimeMs + days * 24 * 60 * 60 * 1000;
+  if (newStart > maxStart) newStart = maxStart;
+  if (newStart < 0) newStart = 0;
+  startTimeMs = newStart;
+  updateRangeDisplay();
+  loadData();
+}
+
+// ---------------------------------------------------------------------
 // Gauge functions
 // ---------------------------------------------------------------------
 
@@ -421,9 +419,9 @@ function createGaugeCards(): void {
     card.id = `gauge-${metric.key}`;
     card.dataset.metric = metric.key;
     card.innerHTML = `
-      <h3>${metric.label}</h3>
-      <canvas id="gaugeCanvas-${metric.key}" width="160" height="160"></canvas>
-    `;
+            <h3>${metric.label}</h3>
+            <canvas id="gaugeCanvas-${metric.key}" width="160" height="160"></canvas>
+        `;
     card.addEventListener("click", () => {
       focusChart(metric.key);
     });
@@ -583,9 +581,6 @@ function focusChart(metricKey: string): void {
 // ---------------------------------------------------------------------
 
 function refresh(): void {
-  const endSeconds = Math.floor(Date.now() / 1000);
-  (document.getElementById("endInput") as HTMLInputElement).value =
-    toDateTimeLocalValue(endSeconds * 1000);
   loadData();
 }
 
@@ -860,26 +855,13 @@ async function loadData(): Promise<void> {
       ? Math.min(...timestamps)
       : now - ONE_DAY_SECONDS * 1000;
 
-    const endSeconds = filters.end ? Number(filters.end) : null;
-    const startSeconds = filters.start ? Number(filters.start) : null;
-
-    let globalMax =
-      endSeconds !== null && Number.isFinite(endSeconds)
-        ? endSeconds * 1000
-        : now;
+    let globalMax = now;
     if (globalMax < globalMin) globalMax = globalMin + ZOOM_LIMIT_MS;
 
     setAllChartsXLimits(globalMin, globalMax);
 
-    let visibleMin =
-      startSeconds !== null && Number.isFinite(startSeconds)
-        ? startSeconds * 1000
-        : Math.max(globalMin, now - 60 * 60 * 1000);
-
-    let visibleMax =
-      endSeconds !== null && Number.isFinite(endSeconds)
-        ? endSeconds * 1000
-        : now;
+    let visibleMin = Math.max(globalMin, startTimeMs);
+    let visibleMax = Math.min(globalMax, endTimeMs);
 
     if (visibleMin >= visibleMax) {
       visibleMin = globalMin;
@@ -918,23 +900,65 @@ async function loadData(): Promise<void> {
 // Event listeners
 // ---------------------------------------------------------------------
 
-filterForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  loadData();
-});
-
-clearFiltersBtn.addEventListener("click", () => {
-  setDefaultDateRange();
-  loadData();
-});
-
+// Refresh button
 refreshBtn.addEventListener("click", refresh);
+
+// Time controls: shift buttons and calendar
+if (chartsGrid) {
+  chartsGrid.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+
+    // Shift buttons
+    if (target.classList.contains("shift-btn")) {
+      const days = parseInt(target.dataset.days || "0");
+      if (days !== 0) shiftStart(days);
+    }
+
+    // Calendar button
+    if (target.classList.contains("calendar-btn")) {
+      if (fp) {
+        fp.setDate([new Date(startTimeMs), new Date(endTimeMs)], false);
+        fp.open();
+      }
+    }
+  });
+}
+
+// ---------------------------------------------------------------------
+// Initialise flatpickr
+// ---------------------------------------------------------------------
+
+const fp = flatpickr(rangePicker, {
+  mode: "range",
+  dateFormat: "Y-m-d H:i",
+  enableTime: true,
+  time_24hr: true,
+  maxDate: "today", // ← prevents future dates
+  defaultDate: [new Date(startTimeMs), new Date(endTimeMs)],
+  onChange: (selectedDates) => {
+    if (selectedDates.length === 2) {
+      let newStart = selectedDates[0].getTime();
+      let newEnd = selectedDates[1].getTime();
+      // Ensure end is not after now
+      const now = Date.now();
+      if (newEnd > now) newEnd = now;
+      if (newStart > newEnd) newStart = newEnd;
+      startTimeMs = newStart;
+      endTimeMs = newEnd;
+      updateRangeDisplay();
+      loadData();
+    }
+  },
+});
 
 // ---------------------------------------------------------------------
 // Initialise
 // ---------------------------------------------------------------------
 
-setDefaultDateRange();
+startTimeMs = Date.now() - ONE_DAY_SECONDS * 1000;
+endTimeMs = Date.now();
+if (startTimeMs > endTimeMs) startTimeMs = endTimeMs;
+updateRangeDisplay();
 createGaugeCards();
 initializeCharts();
 loadData();

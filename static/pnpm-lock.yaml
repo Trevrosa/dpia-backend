@@ -270,6 +270,9 @@ importers:
       chartjs-plugin-zoom:
         specifier: 2.2.0
         version: 2.2.0(chart.js@4.5.1)
+      flatpickr:
+        specifier: ^4.6.13
+        version: 4.6.13
       hammerjs:
         specifier: 2.0.8
         version: 2.0.8
@@ -812,6 +815,9 @@ packages:
       picomatch:
         optional: true
 
+  flatpickr@4.6.13:
+    resolution: {integrity: sha512-97PMG/aywoYpB4IvbvUJi0RQi8vearvU0oov1WW3k0WZPBMrTQVqekSX5CjSG/M4Q3i6A/0FKXC7RyAoAUUSPw==}
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -1292,6 +1298,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
       picomatch: 4.0.5
+
+  flatpickr@4.6.13: {}
 
   fsevents@2.3.3:
     optional: true
