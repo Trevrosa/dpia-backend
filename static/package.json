@@ -1,36 +1,39 @@
 {
-  "name": "static",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "11.17.0",
-      "onFail": "download"
+    "name": "static",
+    "version": "1.0.0",
+    "description": "",
+    "keywords": [],
+    "license": "MIT",
+    "author": "",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "lint": "oxlint",
+        "lint:fix": "oxlint --fix",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
+    },
+    "dependencies": {
+        "chart.js": "4.5.1",
+        "chartjs-adapter-date-fns": "3.0.0",
+        "chartjs-plugin-zoom": "2.2.0",
+        "hammerjs": "2.0.8"
+    },
+    "devDependencies": {
+        "globals": "17.7.0",
+        "oxfmt": "^0.60.0",
+        "oxlint": "^1.75.0",
+        "typescript": "7.0.2",
+        "vite": "8.1.5"
+    },
+    "devEngines": {
+        "packageManager": {
+            "name": "pnpm",
+            "version": "11.17.0",
+            "onFail": "download"
+        }
     }
-  },
-  "type": "module",
-  "dependencies": {
-    "chart.js": "4.5.1",
-    "chartjs-adapter-date-fns": "3.0.0",
-    "chartjs-plugin-zoom": "2.2.0",
-    "hammerjs": "2.0.8"
-  },
-  "devDependencies": {
-    "globals": "17.7.0",
-    "prettier": "3.9.6",
-    "typescript": "7.0.2",
-    "vite": "8.1.5"
-  }
 }
