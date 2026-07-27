@@ -917,6 +917,7 @@ if (chartsGrid) {
     // Calendar button
     if (target.classList.contains("calendar-btn")) {
       if (fp) {
+        fp.set("positionElement", target);
         fp.setDate([new Date(startTimeMs), new Date(endTimeMs)], false);
         fp.open();
       }
