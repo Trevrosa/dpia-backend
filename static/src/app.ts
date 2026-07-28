@@ -581,6 +581,7 @@ function focusChart(metricKey: string): void {
 // ---------------------------------------------------------------------
 
 function refresh(): void {
+  endTimeMs = Date.now()
   loadData();
 }
 
